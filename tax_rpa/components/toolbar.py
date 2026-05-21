@@ -25,7 +25,7 @@ class ToolbarComponent:
             text,
             self.logger,
             self.min_score,
-            self.dry_run,
+            False,
             f"toolbar_{text}",
         )
         return StepResult(

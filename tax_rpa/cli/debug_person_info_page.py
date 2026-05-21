@@ -11,7 +11,7 @@ from typing import Any
 from tax_rpa.app.tax_client_app import TaxClientApp
 from tax_rpa.config.person_import import PersonImportConfig, load_import_config
 from tax_rpa.drivers.logger import RunLogger, to_jsonable
-from tax_rpa.pages.person_info_page import PersonInfoPage
+from tax_rpa.pages.person_info.page import PersonInfoPage
 from tax_rpa.runtime.result import StepResult
 
 

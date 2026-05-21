@@ -10,6 +10,7 @@ from tax_rpa.app.tax_client_app import TaxClientApp, build_launch_decision
 from tax_rpa.config.person_import import PersonImportConfig, load_import_config
 from tax_rpa.drivers.logger import RunLogger
 from tax_rpa.drivers.win32_driver import Win32Driver
+from tax_rpa.runtime.result import StepResult
 from tax_rpa.workflows.import_person_info_workflow import ImportPersonInfoWorkflow
 
 
@@ -97,6 +98,89 @@ def run_from_zero(
     }
 
 
+class SelfCheckApp:
+    def __init__(self, _config: PersonImportConfig, _logger: Any) -> None:
+        pass
+
+    def start_if_needed(self) -> StepResult:
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.start_if_needed", status="self_check_start")
+
+    def wait_for_login(self) -> StepResult:
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.wait_for_login", status="self_check_login")
+
+    def shell(self):
+        return SelfCheckShell()
+
+
+class SelfCheckShell:
+    def open_person_info_page(self):
+        return SelfCheckPersonInfoPage()
+
+
+class SelfCheckPersonInfoPage:
+    def step(self, _name: str, **_data: Any):
+        from contextlib import nullcontext
+
+        return nullcontext()
+
+    def close_message_dialog_if_present(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.close_message_dialog", status="none")
+
+    def click_import_button(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.click_import_button", status="clicked")
+
+    def choose_import_file_option(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.choose_import_file_option",
+            status="selected",
+            evidence={"dialog": {"hwnd": 1}},
+        )
+
+    def choose_person_file(self, path: Path, _dropdown_result: StepResult):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.choose_person_file",
+            status="dry_run",
+            evidence={"file_path": str(path)},
+        )
+
+    def read_import_result(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.wait_import_result", status="success")
+
+
+def run_self_check(
+    config: PersonImportConfig,
+    logger: Any,
+) -> dict[str, Any]:
+    workflow = ImportPersonInfoWorkflow(
+        config,
+        logger,
+        app_factory=lambda config, logger: SelfCheckApp(config, logger),
+    )
+    workflow_result = workflow.run()
+    if not workflow_result.ok:
+        raise RuntimeError(workflow_result.error or workflow_result.status)
+    return {
+        "status": workflow_result.status,
+        "workflow": workflow_result,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Launch the withholding client, wait for login, then import personnel information."
@@ -115,6 +199,11 @@ def parse_args() -> argparse.Namespace:
         "--no-self-elevate",
         action="store_true",
         help="Do not relaunch this script as administrator when not elevated.",
+    )
+    parser.add_argument(
+        "--self-check",
+        action="store_true",
+        help="Run the workflow composition with fake app/page objects to verify the framework wiring.",
     )
     return parser.parse_args()
 
@@ -147,7 +236,7 @@ def main() -> None:
         config = load_import_config(args.config)
         if args.dry_run:
             config = with_dry_run(config)
-        summary = run_from_zero(config, logger)
+        summary = run_self_check(config, logger) if args.self_check else run_from_zero(config, logger)
         summary_path = logger.write_json("summary.json", summary)
         logger.log("done", summary["status"], summary=summary_path)
         print(summary_path)

@@ -1,5 +1,6 @@
 import unittest
 from contextlib import contextmanager
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -39,9 +40,28 @@ class FakePersonPage:
     def __init__(self, events):
         self.events = events
 
-    def import_person_file(self, path):
-        self.events.append(f"import:{path.name}")
-        return StepResult(ok=True, name="import_person_file", status="success")
+    def step(self, _name, **_data):
+        return nullcontext()
+
+    def close_message_dialog_if_present(self):
+        self.events.append("message_dialog")
+        return StepResult(ok=True, name="message_dialog", status="ok")
+
+    def click_import_button(self):
+        self.events.append(f"toolbar:{IMPORT_BUTTON_TEXT}")
+        return StepResult(ok=True, name="toolbar", status="ok")
+
+    def choose_import_file_option(self):
+        self.events.append(f"dropdown:{IMPORT_OPTION_TEXTS[0]}")
+        return StepResult(ok=True, name="dropdown", status="ok", evidence={"dialog": {"hwnd": 1}})
+
+    def choose_person_file(self, path, _dropdown_result):
+        self.events.append(f"file_dialog:{path.name}")
+        return StepResult(ok=True, name="file_dialog", status="ok")
+
+    def read_import_result(self):
+        self.events.append("wait_import_result")
+        return StepResult(ok=True, name="wait_import_result", status="success")
 
 
 class FakeComponent:
@@ -97,7 +117,16 @@ class ComponentArchitectureTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(
             events,
-            ["start", "wait_login", "open_person_page", "import:persons.xlsx"],
+            [
+                "start",
+                "wait_login",
+                "open_person_page",
+                "message_dialog",
+                f"toolbar:{IMPORT_BUTTON_TEXT}",
+                f"dropdown:{IMPORT_OPTION_TEXTS[0]}",
+                "file_dialog:persons.xlsx",
+                "wait_import_result",
+            ],
         )
 
     def test_person_info_page_composes_components_for_import(self):

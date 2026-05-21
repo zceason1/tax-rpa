@@ -1,11 +1,13 @@
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from tax_rpa.components.file_dialog import FileDialogComponent
 from tax_rpa.components.import_dropdown import ImportDropdownComponent
 from tax_rpa.components.left_nav import LeftNavComponent
 from tax_rpa.components.message_dialog import MessageDialogComponent
+from tax_rpa.components.toolbar import ToolbarComponent
 
 
 class FakeLogger:
@@ -43,6 +45,20 @@ class FakeOcr:
 
 
 class DriverBoundaryTests(unittest.TestCase):
+    def test_launch_client_uses_shell_execute_for_shortcuts(self):
+        from tax_rpa.drivers.win32_driver import Win32Driver
+
+        logger = FakeLogger()
+        shell_execute = Mock(return_value=33)
+
+        with patch("tax_rpa.drivers.win32_driver.ShellExecuteW", shell_execute):
+            result = Win32Driver().launch_client(Path("C:/client/自然人电子税务局.lnk"), logger)
+
+        self.assertIsNone(result)
+        shell_execute.assert_called_once()
+        self.assertEqual(shell_execute.call_args.args[1], "open")
+        self.assertEqual(shell_execute.call_args.args[2], "C:\\client\\自然人电子税务局.lnk")
+
     def test_import_dropdown_uses_injected_win32_for_existing_file_dialog(self):
         calls = []
 
@@ -144,6 +160,81 @@ class DriverBoundaryTests(unittest.TestCase):
         self.assertEqual(calls[0], ("get_rect", 100))
         self.assertEqual(calls[1], ("collect_children", 100))
         self.assertEqual(ocr.clicks[0][0], [0, 100, 160, 780])
+
+    def test_left_nav_clicks_even_when_workflow_is_dry_run(self):
+        class FakeWin32:
+            def get_rect(self, _hwnd):
+                return [0, 0, 1000, 800]
+
+            def collect_children(self, _hwnd):
+                return [{"rect": [0, 100, 160, 780]}]
+
+        class FakeRegion:
+            def detect_left_nav_rect(self, _rect, _children):
+                return [0, 100, 160, 780], {"source": "fake"}
+
+        ocr = FakeOcr()
+        component = LeftNavComponent(
+            hwnd=100,
+            logger=FakeLogger(),
+            config=SimpleNamespace(ocr_score_threshold=0.35, dry_run=True, window_timeout_seconds=1),
+            ocr=ocr,
+            region=FakeRegion(),
+            win32=FakeWin32(),
+        )
+
+        result = component.open_page("人员信息采集")
+
+        self.assertTrue(result.ok)
+        self.assertFalse(ocr.clicks[0][3])
+
+    def test_toolbar_clicks_even_when_workflow_is_dry_run(self):
+        ocr = FakeOcr()
+        component = ToolbarComponent(
+            content_rect=[10, 20, 300, 80],
+            logger=FakeLogger(),
+            min_score=0.35,
+            dry_run=True,
+            ocr=ocr,
+        )
+
+        result = component.click_button("导入")
+
+        self.assertTrue(result.ok)
+        self.assertFalse(ocr.clicks[0][3])
+
+    def test_import_dropdown_clicks_option_even_when_workflow_is_dry_run(self):
+        calls = []
+
+        class FakeWin32:
+            def __init__(self):
+                self.find_calls = 0
+
+            def find_file_dialog(self, timeout_seconds, allowed_pids=None):
+                calls.append(("find_file_dialog", timeout_seconds, allowed_pids))
+                self.find_calls += 1
+                if self.find_calls >= 3:
+                    return {"hwnd": 20, "pid": 10, "rect": [1, 2, 3, 4]}
+                return None
+
+            def get_rect(self, hwnd):
+                calls.append(("get_rect", hwnd))
+                return [0, 0, 800, 600]
+
+        ocr = FakeOcr()
+        component = ImportDropdownComponent(
+            hwnd=100,
+            logger=FakeLogger(),
+            config=SimpleNamespace(import_timeout_seconds=10, ocr_score_threshold=0.35, dry_run=True),
+            allowed_pids={10},
+            ocr=ocr,
+            win32=FakeWin32(),
+        )
+
+        result = component.choose_item("导入文件")
+
+        self.assertTrue(result.ok)
+        self.assertFalse(ocr.clicks[0][3])
 
     def test_message_dialog_uses_injected_win32_for_dialog_collection(self):
         calls = []

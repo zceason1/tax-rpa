@@ -1,4 +1,4 @@
-from tax_rpa.pages.person_info_page import PersonInfoPage
+from tax_rpa.pages.person_info.page import PersonInfoPage
 from tax_rpa.runtime.context import RpaContext
 
 

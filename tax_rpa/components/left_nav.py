@@ -47,7 +47,7 @@ class LeftNavComponent:
             text,
             self.logger,
             self.config.ocr_score_threshold,
-            self.config.dry_run,
+            False,
             "left_nav",
         )
 

@@ -3,6 +3,9 @@ from typing import Any
 
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.app.tax_client_app import TaxClientApp
+from tax_rpa.pages.person_info.steps.import_person_file import ImportPersonFileStep
+from tax_rpa.pages.person_info.steps.open_page import OpenPersonInfoPageStep
+from tax_rpa.pages.person_info.steps.wait_import_result import WaitImportResultStep
 from tax_rpa.runtime.result import StepResult, WorkflowResult
 
 
@@ -43,8 +46,20 @@ class ImportPersonInfoWorkflow:
                 error=login.error,
             )
 
-        page = app.shell().open_person_info_page()
-        import_result = page.import_person_file(self.config.person_info_file)
+        page = OpenPersonInfoPageStep(app.shell()).run()
+        import_file = ImportPersonFileStep(page).run(self.config.person_info_file)
+        steps.append(import_file)
+        if not import_file.ok:
+            return WorkflowResult(
+                ok=False,
+                name="import_person_info_workflow",
+                status=import_file.status,
+                steps=steps,
+                evidence={"import_file": import_file.evidence},
+                error=import_file.error,
+            )
+
+        import_result = WaitImportResultStep(page).run()
         steps.append(import_result)
 
         return WorkflowResult(
@@ -52,6 +67,9 @@ class ImportPersonInfoWorkflow:
             name="import_person_info_workflow",
             status=import_result.status,
             steps=steps,
-            evidence={"import_result": import_result.evidence},
+            evidence={
+                "import_file": import_file.evidence,
+                "import_result": import_result.evidence,
+            },
             error=import_result.error,
         )

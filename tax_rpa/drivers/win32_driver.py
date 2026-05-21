@@ -13,6 +13,7 @@ from tax_rpa.utils import normalize_text
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
+shell32 = ctypes.windll.shell32
 
 try:
     user32.SetProcessDPIAware()
@@ -36,8 +37,18 @@ SetWindowPos = user32.SetWindowPos
 AttachThreadInput = user32.AttachThreadInput
 GetCurrentThreadId = kernel32.GetCurrentThreadId
 SendMessageW = user32.SendMessageW
+ShellExecuteW = shell32.ShellExecuteW
 
 SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+ShellExecuteW.argtypes = [
+    wintypes.HWND,
+    wintypes.LPCWSTR,
+    wintypes.LPCWSTR,
+    wintypes.LPCWSTR,
+    wintypes.LPCWSTR,
+    ctypes.c_int,
+]
+ShellExecuteW.restype = ctypes.c_void_p
 SetWindowPos.argtypes = [
     wintypes.HWND,
     wintypes.HWND,
@@ -300,8 +311,22 @@ class Win32Driver:
     def configure_base_process_name(self, process_name: str) -> None:
         self.process_name = process_name.lower()
 
-    def launch_client(self, app_path: Path, logger: Any) -> subprocess.Popen:
+    def launch_client(self, app_path: Path, logger: Any) -> subprocess.Popen | None:
         logger.log("launch_client", "start", app_path=str(app_path))
+        if app_path.suffix.lower() == ".lnk":
+            result = ShellExecuteW(
+                None,
+                "open",
+                str(app_path),
+                None,
+                str(app_path.parent),
+                1,
+            )
+            if result <= 32:
+                raise RuntimeError(f"Failed to launch shortcut. ShellExecuteW={result}: {app_path}")
+            logger.log("launch_client", "started_shortcut", shell_execute=result)
+            return None
+
         process = subprocess.Popen([str(app_path)], cwd=str(app_path.parent))
         logger.log("launch_client", "started", pid=process.pid)
         return process
