@@ -1,0 +1,12 @@
+{
+  "person_info_file": "../data/person_import_probe.xlsx",
+  "app_path": "C:/path/to/EPPortalITS.exe",
+  "process_name": "EPPortalITS.exe",
+  "dry_run": true,
+  "launch_timeout_seconds": 60,
+  "login_timeout_seconds": 300,
+  "window_timeout_seconds": 90,
+  "import_timeout_seconds": 120,
+  "result_timeout_seconds": 60,
+  "ocr_score_threshold": 0.35
+}
