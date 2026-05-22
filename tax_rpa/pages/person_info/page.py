@@ -5,7 +5,6 @@ from typing import Any
 
 from tax_rpa.components.file_dialog import FileDialogComponent
 from tax_rpa.components.left_nav import LeftNavComponent
-from tax_rpa.components.message_dialog import MessageDialogComponent
 from tax_rpa.components.toolbar import ToolbarComponent
 from tax_rpa.drivers.ocr_driver import OcrDriver, find_best_ocr_match, ocr_rect
 from tax_rpa.drivers.region_driver import RegionDriver
@@ -14,11 +13,12 @@ from tax_rpa.pages.person_info.components.import_dropdown import ImportDropdownC
 from tax_rpa.pages.person_info.components.import_result import ImportResultComponent
 from tax_rpa.pages.person_info.elements.import_menu import IMPORT_BUTTON, IMPORT_FILE_OPTIONS
 from tax_rpa.pages.person_info.elements.page_markers import PERSON_INFO_PAGE_MARKER
+from tax_rpa.pages.shared.dialogs import PageDialogMixin
 from tax_rpa.runtime.context import RpaContext
 from tax_rpa.runtime.result import StepResult
 
 
-class PersonInfoPage:
+class PersonInfoPage(PageDialogMixin):
     def __init__(
         self,
         context: RpaContext | None,
@@ -83,6 +83,7 @@ class PersonInfoPage:
     def open(self) -> StepResult:
         if self.context is None:
             return StepResult(ok=True, name="person_info_page.open", status="assumed_ready")
+        before_dialog = self.close_message_dialog_if_present("cancel")
         result = LeftNavComponent(
             self.hwnd,
             self.context.logger,
@@ -92,11 +93,16 @@ class PersonInfoPage:
             PERSON_INFO_PAGE_MARKER.text,
             ready_check=self.is_ready,
         )
+        after_dialog = self.close_message_dialog_if_present("cancel")
         return StepResult(
             ok=result.ok,
             name="person_info_page.open",
             status=result.status,
-            evidence=result.evidence,
+            evidence={
+                **result.evidence,
+                "before_dialog": before_dialog,
+                "after_dialog": after_dialog,
+            },
             error=result.error,
         )
 
@@ -166,21 +172,6 @@ class PersonInfoPage:
         if self.import_result_reader is not None:
             return self.import_result_reader()
         return self.default_import_result_component().read_result()
-
-    def close_message_dialog_if_present(self) -> StepResult:
-        if self.message_dialog is not None:
-            return self.message_dialog.close_if_present()
-        if self.context is not None and self.context.main_window is not None:
-            allowed_pids = {int(self.context.main_window["pid"])}
-            result = MessageDialogComponent(
-                allowed_pids,
-                self.context.logger,
-                self.context.config.dry_run,
-                win32=self.win32,
-            ).close_if_present()
-            self.win32.set_foreground(self.hwnd)
-            return result
-        return StepResult(ok=True, name="message_dialog.close_if_present", status="skipped")
 
     def default_toolbar(self) -> ToolbarComponent:
         if self.context is None:

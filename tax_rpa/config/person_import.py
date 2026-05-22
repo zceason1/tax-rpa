@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +9,10 @@ class PersonImportConfigError(ValueError):
 
 
 EXCEL_SUFFIXES = {".xlsx", ".xls", ".xlsm"}
+ALLOWED_ACTION_LABELS = {
+    "申报密码登录",
+    "综合所得申报",
+}
 FORBIDDEN_ACTION_KEYWORDS = (
     "报送",
     "发送申报",
@@ -17,6 +21,17 @@ FORBIDDEN_ACTION_KEYWORDS = (
     "缴纳",
     "税款缴纳",
 )
+
+
+@dataclass(frozen=True)
+class ImportFileConfig:
+    file: Path
+
+
+@dataclass(frozen=True)
+class LoginConfig:
+    method: str = "申报密码登录"
+    declaration_password: str | None = None
 
 
 @dataclass(frozen=True)
@@ -32,6 +47,15 @@ class PersonImportConfig:
     result_timeout_seconds: int = 60
     ocr_score_threshold: float = 0.35
     config_path: Path | None = None
+    imports: dict[str, ImportFileConfig] = field(default_factory=dict)
+    login: LoginConfig = field(default_factory=LoginConfig)
+
+    def import_file(self, location: str) -> Path:
+        if location in self.imports:
+            return validate_excel_path(self.imports[location].file)
+        if location == "person_info":
+            return validate_excel_path(self.person_info_file)
+        raise PersonImportConfigError(f"Unknown import location: {location}")
 
 
 def validate_excel_path(path: str | Path) -> Path:
@@ -60,6 +84,9 @@ def validate_app_path(path: str | Path) -> Path:
 
 def assert_safe_action(label: str) -> None:
     normalized = "".join(str(label).split())
+    allowed = {"".join(item.split()) for item in ALLOWED_ACTION_LABELS}
+    if normalized in allowed:
+        return
     for keyword in FORBIDDEN_ACTION_KEYWORDS:
         if keyword in normalized:
             raise PersonImportConfigError(
@@ -95,6 +122,61 @@ def _resolve_config_relative_path(config_path: Path, raw_path: str) -> Path:
     return candidate
 
 
+def _read_imports(
+    data: dict[str, Any],
+    config_path: Path,
+    person_info_file: Path,
+) -> dict[str, ImportFileConfig]:
+    raw_imports = data.get("imports", {})
+    if raw_imports is None:
+        raw_imports = {}
+    if not isinstance(raw_imports, dict):
+        raise PersonImportConfigError("imports must be a JSON object")
+
+    imports: dict[str, ImportFileConfig] = {
+        "person_info": ImportFileConfig(file=person_info_file),
+    }
+    for location, raw_config in raw_imports.items():
+        if not isinstance(location, str) or not location.strip():
+            raise PersonImportConfigError("import location keys must be non-empty strings")
+        if not isinstance(raw_config, dict):
+            raise PersonImportConfigError(f"imports.{location} must be a JSON object")
+        raw_file = raw_config.get("file")
+        if not isinstance(raw_file, str) or not raw_file.strip():
+            raise PersonImportConfigError(
+                f"imports.{location}.file must be a non-empty string"
+            )
+        imports[location.strip()] = ImportFileConfig(
+            file=_resolve_config_relative_path(config_path, raw_file).resolve()
+        )
+    return imports
+
+
+def _read_login(data: dict[str, Any]) -> LoginConfig:
+    raw_login = data.get("login", {})
+    if raw_login is None:
+        raw_login = {}
+    if not isinstance(raw_login, dict):
+        raise PersonImportConfigError("login must be a JSON object")
+
+    raw_method = raw_login.get("method", "申报密码登录")
+    if not isinstance(raw_method, str) or not raw_method.strip():
+        raise PersonImportConfigError("login.method must be a non-empty string")
+
+    raw_password = raw_login.get("declaration_password")
+    if raw_password is None or raw_password == "":
+        password = None
+    elif isinstance(raw_password, str):
+        password = raw_password
+    else:
+        raise PersonImportConfigError("login.declaration_password must be a string")
+
+    return LoginConfig(
+        method=raw_method.strip(),
+        declaration_password=password,
+    )
+
+
 def load_import_config(path: str | Path) -> PersonImportConfig:
     config_path = Path(path).expanduser().resolve()
     if not config_path.exists():
@@ -115,6 +197,8 @@ def load_import_config(path: str | Path) -> PersonImportConfig:
     person_info_file = validate_excel_path(
         _resolve_config_relative_path(config_path, raw_file)
     )
+    imports = _read_imports(data, config_path, person_info_file)
+    login = _read_login(data)
     raw_app_path = data.get("app_path")
     if raw_app_path is None or raw_app_path == "":
         app_path = None
@@ -135,4 +219,6 @@ def load_import_config(path: str | Path) -> PersonImportConfig:
         result_timeout_seconds=_read_int(data, "result_timeout_seconds", 60),
         ocr_score_threshold=_read_float(data, "ocr_score_threshold", 0.35),
         config_path=config_path,
+        imports=imports,
+        login=login,
     )

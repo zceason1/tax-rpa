@@ -3,14 +3,15 @@ from typing import Any
 
 from tax_rpa.app.tax_client_app import TaxClientApp
 from tax_rpa.config.person_import import PersonImportConfig
-from tax_rpa.pages.person_info.steps.import_person_file import ImportPersonFileStep
-from tax_rpa.pages.person_info.steps.open_page import OpenPersonInfoPageStep
-from tax_rpa.pages.person_info.steps.wait_import_result import WaitImportResultStep
+from tax_rpa.pages.special_deduction.steps.download_update_all_persons import (
+    DownloadUpdateAllPersonsStep,
+)
+from tax_rpa.pages.special_deduction.steps.open_page import OpenSpecialDeductionPageStep
 from tax_rpa.runtime.result import StepResult, WorkflowResult
 from tax_rpa.workflows.app_lifecycle_workflow import AppLifecycleWorkflow
 
 
-class ImportPersonInfoWorkflow:
+class UpdateSpecialDeductionWorkflow:
     def __init__(
         self,
         config: PersonImportConfig,
@@ -31,7 +32,7 @@ class ImportPersonInfoWorkflow:
         if not lifecycle_result.ok:
             return WorkflowResult(
                 ok=False,
-                name="import_person_info_workflow",
+                name="update_special_deduction_workflow",
                 status=lifecycle_result.status,
                 steps=lifecycle_result.steps,
                 error=lifecycle_result.error,
@@ -39,7 +40,7 @@ class ImportPersonInfoWorkflow:
         business_result = self.run_on_app(lifecycle.app)
         return WorkflowResult(
             ok=business_result.ok,
-            name="import_person_info_workflow",
+            name="update_special_deduction_workflow",
             status=business_result.status,
             steps=[*lifecycle_result.steps, *business_result.steps],
             evidence=business_result.evidence,
@@ -48,30 +49,24 @@ class ImportPersonInfoWorkflow:
 
     def run_on_app(self, app: Any) -> WorkflowResult:
         steps: list[StepResult] = []
-        page = OpenPersonInfoPageStep(app.shell()).run()
-        import_file = ImportPersonFileStep(page).run(self.config.person_info_file)
-        steps.append(import_file)
-        if not import_file.ok:
-            return WorkflowResult(
-                ok=False,
-                name="import_person_info_workflow",
-                status=import_file.status,
-                steps=steps,
-                evidence={"import_file": import_file.evidence},
-                error=import_file.error,
-            )
-
-        import_result = WaitImportResultStep(page).run()
-        steps.append(import_result)
+        page = OpenSpecialDeductionPageStep(app.shell()).run()
+        update_result = DownloadUpdateAllPersonsStep(page).run()
+        steps.append(update_result)
 
         return WorkflowResult(
-            ok=import_result.ok,
-            name="import_person_info_workflow",
-            status=import_result.status,
+            ok=update_result.ok,
+            name="update_special_deduction_workflow",
+            status=update_result.status,
             steps=steps,
-            evidence={
-                "import_file": import_file.evidence,
-                "import_result": import_result.evidence,
-            },
-            error=import_result.error,
+            evidence={"download_update": update_result.evidence},
+            error=update_result.error,
+        )
+
+    def _failed(self, result: StepResult, steps: list[StepResult]) -> WorkflowResult:
+        return WorkflowResult(
+            ok=False,
+            name="update_special_deduction_workflow",
+            status=result.status,
+            steps=steps,
+            error=result.error,
         )

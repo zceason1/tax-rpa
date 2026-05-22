@@ -112,6 +112,11 @@ class SelfCheckApp:
 
         return StepResult(ok=True, name="self_check.wait_for_login", status="self_check_login")
 
+    def reset(self) -> StepResult:
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.reset", status="self_check_reset")
+
     def shell(self):
         return SelfCheckShell()
 
@@ -119,6 +124,12 @@ class SelfCheckApp:
 class SelfCheckShell:
     def open_person_info_page(self):
         return SelfCheckPersonInfoPage()
+
+    def open_special_deduction_page(self):
+        return SelfCheckSpecialDeductionPage()
+
+    def open_comprehensive_income_page(self):
+        return SelfCheckComprehensiveIncomePage()
 
 
 class SelfCheckPersonInfoPage:
@@ -161,6 +172,65 @@ class SelfCheckPersonInfoPage:
         from tax_rpa.runtime.result import StepResult
 
         return StepResult(ok=True, name="self_check.wait_import_result", status="success")
+
+
+class SelfCheckSpecialDeductionPage:
+    def step(self, _name: str, **_data: Any):
+        from contextlib import nullcontext
+
+        return nullcontext()
+
+    def click_download_update(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.click_download_update", status="dry_run")
+
+    def click_all_persons(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.click_all_persons", status="dry_run")
+
+
+class SelfCheckComprehensiveIncomePage:
+    def step(self, _name: str, **_data: Any):
+        from contextlib import nullcontext
+
+        return nullcontext()
+
+    def click_salary_income_row(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.click_salary_income_row", status="dry_run")
+
+    def click_salary_income_fill(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.click_salary_income_fill", status="dry_run")
+
+    def click_import_button(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.click_import_button", status="dry_run")
+
+    def choose_import_data_option(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.choose_import_data_option",
+            status="dry_run",
+            evidence={"dialog": {"hwnd": 1}},
+        )
+
+    def choose_salary_income_file(self, path: Path, _import_option_result: StepResult):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.choose_salary_income_file",
+            status="dry_run",
+            evidence={"file_path": str(path)},
+        )
 
 
 def run_self_check(
@@ -211,6 +281,7 @@ def parse_args() -> argparse.Namespace:
 def with_dry_run(config: PersonImportConfig) -> PersonImportConfig:
     return PersonImportConfig(
         person_info_file=config.person_info_file,
+        imports=config.imports,
         app_path=config.app_path,
         process_name=config.process_name,
         dry_run=True,
@@ -221,6 +292,7 @@ def with_dry_run(config: PersonImportConfig) -> PersonImportConfig:
         result_timeout_seconds=config.result_timeout_seconds,
         ocr_score_threshold=config.ocr_score_threshold,
         config_path=config.config_path,
+        login=config.login,
     )
 
 

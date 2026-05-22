@@ -341,6 +341,45 @@ class Win32Driver:
             time.sleep(1.0)
         raise RuntimeError(f"Timed out waiting for process: {process_name}")
 
+    def terminate_processes(
+        self,
+        pids: list[int],
+        timeout_seconds: int,
+        logger: Any,
+    ) -> dict[str, Any]:
+        processes = []
+        for pid in pids:
+            try:
+                proc = psutil.Process(pid)
+                proc.terminate()
+                processes.append(proc)
+            except psutil.NoSuchProcess:
+                pass
+
+        gone, alive = psutil.wait_procs(processes, timeout=timeout_seconds)
+        for proc in alive:
+            try:
+                proc.kill()
+            except psutil.NoSuchProcess:
+                pass
+        if alive:
+            gone_after_kill, alive_after_kill = psutil.wait_procs(alive, timeout=5)
+            gone.extend(gone_after_kill)
+            alive = alive_after_kill
+
+        result = {
+            "requested": pids,
+            "terminated": [proc.pid for proc in gone],
+            "alive": [proc.pid for proc in alive],
+            "timeout_seconds": timeout_seconds,
+        }
+        logger.log(
+            "terminate_processes",
+            "ok" if not alive else "alive_after_kill",
+            **result,
+        )
+        return result
+
     def find_main_window(self, pids: list[int], logger: Any) -> dict[str, Any]:
         return find_main_window(pids, logger=logger)
 

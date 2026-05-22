@@ -1,8 +1,13 @@
 from typing import Any
 
 from tax_rpa.constants import FILE_DIALOG_TITLE_HINTS
+from tax_rpa.drivers.mouse_driver import MouseDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
 from tax_rpa.runtime.result import StepResult
+
+CONFIRM_BUTTON_TEXTS = ("确定", "确认", "是", "OK", "Yes")
+CANCEL_BUTTON_TEXTS = ("取消", "否", "关闭", "Cancel", "No")
+DialogAction = str
 
 
 def is_blocking_dialog(window: dict[str, Any]) -> bool:
@@ -37,11 +42,14 @@ def close_blocking_dialogs(
     logger: Any,
     dry_run: bool,
     timeout_seconds: int = 5,
+    action: DialogAction = "escape",
+    mouse: MouseDriver | None = None,
     win32: Win32Driver | None = None,
 ) -> list[dict[str, Any]]:
     import time
 
     driver = win32 or Win32Driver()
+    mouse_driver = mouse or MouseDriver()
     closed = []
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
@@ -56,7 +64,28 @@ def close_blocking_dialogs(
         import pyautogui
 
         driver.set_foreground(dialog["hwnd"])
-        pyautogui.press("esc")
+        if action == "confirm":
+            button = driver.find_button_by_labels(
+                driver.collect_children(dialog["hwnd"]),
+                CONFIRM_BUTTON_TEXTS,
+            )
+            if button is not None:
+                mouse_driver.click(driver.rect_center(button["rect"]))
+            else:
+                pyautogui.press("enter")
+        elif action == "cancel":
+            button = driver.find_button_by_labels(
+                driver.collect_children(dialog["hwnd"]),
+                CANCEL_BUTTON_TEXTS,
+            )
+            if button is not None:
+                mouse_driver.click(driver.rect_center(button["rect"]))
+            else:
+                pyautogui.press("esc")
+        elif action == "escape":
+            pyautogui.press("esc")
+        else:
+            raise ValueError(f"Unsupported dialog action: {action}")
         closed.append(dialog)
         time.sleep(0.8)
     return closed
@@ -76,10 +105,14 @@ class MessageDialogComponent:
         self.win32 = win32 or Win32Driver()
 
     def close_if_present(self) -> StepResult:
+        return self.close_with_action("escape")
+
+    def close_with_action(self, action: DialogAction) -> StepResult:
         closed = close_blocking_dialogs(
             self.allowed_pids,
             self.logger,
             self.dry_run,
+            action=action,
             win32=self.win32,
         )
         return StepResult(

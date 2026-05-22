@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from tax_rpa.app.main_shell import MainShell
+from tax_rpa.components.login import LoginComponent
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.drivers.win32_driver import Win32Driver
 from tax_rpa.runtime.context import RpaContext
@@ -28,6 +29,32 @@ class TaxClientApp:
         self.logger = logger
         self.win32 = win32 or Win32Driver()
         self.context = RpaContext(config=config, logger=logger)
+
+    def reset(self) -> StepResult:
+        self.win32.configure_base_process_name(self.config.process_name)
+        pids = self.win32.find_process_ids(self.config.process_name)
+        if not pids:
+            self.logger.log("reset_client", "not_running", process_name=self.config.process_name)
+            return StepResult(
+                ok=True,
+                name="tax_client_app.reset",
+                status="not_running",
+                evidence={"pids": []},
+            )
+
+        result = self.win32.terminate_processes(
+            pids,
+            self.config.launch_timeout_seconds,
+            self.logger,
+        )
+        ok = not result.get("alive")
+        return StepResult(
+            ok=ok,
+            name="tax_client_app.reset",
+            status="terminated" if ok else "alive_after_kill",
+            evidence={"result": result},
+            error=None if ok else f"Client processes still alive: {result.get('alive')}",
+        )
 
     def start_if_needed(self) -> StepResult:
         self.win32.configure_base_process_name(self.config.process_name)
@@ -63,6 +90,7 @@ class TaxClientApp:
         deadline = time.time() + self.config.login_timeout_seconds
         last_error = None
         last_log_at = 0.0
+        auto_login_attempted = False
         while time.time() < deadline:
             pids = self.win32.find_process_ids(self.config.process_name)
             if pids:
@@ -79,6 +107,21 @@ class TaxClientApp:
                     )
                 except Exception as exc:
                     last_error = str(exc)
+                    if not auto_login_attempted:
+                        try:
+                            auto_login = self._try_auto_login(pids)
+                        except Exception as login_exc:
+                            last_error = str(login_exc)
+                            self.logger.log(
+                                "auto_login",
+                                "not_ready",
+                                error=str(login_exc),
+                                pids=pids,
+                            )
+                        else:
+                            auto_login_attempted = (
+                                auto_login is not None and auto_login.ok
+                            )
 
             now = time.time()
             if now - last_log_at >= 10:
@@ -100,6 +143,32 @@ class TaxClientApp:
             evidence={"last_error": last_error},
             error=f"Timed out waiting for main window after login: {last_error}",
         )
+
+    def _try_auto_login(self, pids: list[int]) -> StepResult | None:
+        password = self.config.login.declaration_password
+        if not password:
+            return None
+
+        windows = self.win32.collect_top_windows_for_pids(pids)
+        if not windows:
+            self.logger.log("auto_login", "no_login_window", pids=pids)
+            return None
+
+        login_window = windows[0]
+        self.win32.set_foreground(login_window["hwnd"])
+        result = LoginComponent(
+            hwnd=login_window["hwnd"],
+            window_rect=login_window["rect"],
+            logger=self.logger,
+            config=self.config,
+        ).login_with_declaration_password(password)
+        self.logger.log(
+            "auto_login",
+            result.status,
+            method=self.config.login.method,
+            password_configured=True,
+        )
+        return result
 
     def shell(self) -> MainShell:
         return MainShell(self.context)

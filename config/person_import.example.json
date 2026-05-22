@@ -1,7 +1,19 @@
 {
   "person_info_file": "../data/person_import_probe.xlsx",
-  "app_path": "C:/path/to/EPPortalITS.exe",
+  "imports": {
+    "person_info": {
+      "file": "../data/person_import_probe.xlsx"
+    },
+    "salary_income": {
+      "file": "../data/salary_income_import.xlsx"
+    }
+  },
+  "app_path": "",
   "process_name": "EPPortalITS.exe",
+  "login": {
+    "method": "申报密码登录",
+    "declaration_password": ""
+  },
   "dry_run": true,
   "launch_timeout_seconds": 60,
   "login_timeout_seconds": 300,

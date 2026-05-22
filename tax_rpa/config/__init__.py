@@ -1,4 +1,6 @@
 from tax_rpa.config.person_import import (
+    ImportFileConfig,
+    LoginConfig,
     PersonImportConfig,
     PersonImportConfigError,
     assert_safe_action,
@@ -8,6 +10,8 @@ from tax_rpa.config.person_import import (
 )
 
 __all__ = [
+    "ImportFileConfig",
+    "LoginConfig",
     "PersonImportConfig",
     "PersonImportConfigError",
     "assert_safe_action",
