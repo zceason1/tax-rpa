@@ -3,6 +3,7 @@ from typing import Any
 
 from tax_rpa.components.content_text import ContentTextComponent
 from tax_rpa.components.left_nav import LeftNavComponent
+from tax_rpa.drivers.mouse_driver import MouseDriver
 from tax_rpa.drivers.ocr_driver import OcrDriver, find_best_ocr_match, ocr_rect
 from tax_rpa.drivers.region_driver import RegionDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
@@ -26,6 +27,7 @@ class SpecialDeductionPage(PageDialogMixin):
         toolbar: Any | None = None,
         content_text: Any | None = None,
         message_dialog: Any | None = None,
+        mouse: MouseDriver | None = None,
         win32: Win32Driver | None = None,
     ) -> None:
         self.context = context
@@ -33,6 +35,7 @@ class SpecialDeductionPage(PageDialogMixin):
         self.toolbar = toolbar
         self.content_text = content_text
         self.message_dialog = message_dialog
+        self.mouse = mouse or MouseDriver()
         self.ocr = OcrDriver()
         self.region = RegionDriver()
         self.win32 = win32 or Win32Driver()
@@ -89,6 +92,7 @@ class SpecialDeductionPage(PageDialogMixin):
             self.context.logger,
             self.context.config,
             win32=self.win32,
+            action_policy=self.context.action_policy,
         ).open_page(
             SPECIAL_DEDUCTION_PAGE_MARKER.text,
             ready_check=self.is_ready,
@@ -119,6 +123,68 @@ class SpecialDeductionPage(PageDialogMixin):
     def click_all_persons(self) -> StepResult:
         return self._content_text().click_text(ALL_PERSONS_OPTION.text)
 
+    def click_all_persons_fallback(
+        self,
+        download_result: StepResult,
+        error: Exception | None = None,
+    ) -> StepResult:
+        click_info = download_result.evidence.get("click", {})
+        origin = click_info.get("click")
+        match = click_info.get("match", {})
+        box = match.get("box") or []
+        if not isinstance(origin, list) or len(origin) != 2:
+            return StepResult(
+                ok=False,
+                name="special_deduction.click_all_persons_fallback",
+                status="fallback_coordinates_missing",
+                evidence={"download_update": download_result.evidence},
+                error="All persons fallback requires the prior download-update click coordinates",
+            )
+
+        height = 0
+        if len(box) >= 4:
+            ys = [point[1] for point in box if isinstance(point, list) and len(point) >= 2]
+            if ys:
+                height = max(ys) - min(ys)
+        offset_y = max(48, round(height * 2.2)) if height else 56
+        target = [int(origin[0]), int(origin[1] + offset_y)]
+
+        logger = getattr(self.context, "logger", None) if self.context is not None else None
+        action_policy = (
+            getattr(self.context, "action_policy", None) if self.context is not None else None
+        )
+        if action_policy is not None:
+            decision = action_policy.before_click(
+                ALL_PERSONS_OPTION.text,
+                {"step_name": "special_deduction.click_all_persons_fallback"},
+            )
+            if not decision.allowed:
+                return decision.to_step_result("special_deduction.click_all_persons_fallback")
+        if logger is not None:
+            logger.log(
+                "special_deduction_all_persons_fallback",
+                "click",
+                origin=origin,
+                target=target,
+                prior_error=str(error) if error else None,
+            )
+
+        click_result = self.mouse.click(target)
+        return StepResult(
+            ok=True,
+            name="special_deduction.click_all_persons_fallback",
+            status="clicked",
+            evidence={
+                "download_update": download_result.evidence,
+                "fallback_target": target,
+                "click_result": click_result,
+                "prior_error": str(error) if error else None,
+            },
+            side_effect_started=True,
+            side_effect_committed=True,
+            retry_allowed=False,
+        )
+
     def default_content_text(self) -> ContentTextComponent:
         if self.context is None:
             raise RuntimeError("Default content text requires RpaContext")
@@ -127,6 +193,7 @@ class SpecialDeductionPage(PageDialogMixin):
             self.context.logger,
             self.context.config.ocr_score_threshold,
             self.context.config.dry_run,
+            action_policy=self.context.action_policy,
         )
 
     def _content_text(self) -> Any:

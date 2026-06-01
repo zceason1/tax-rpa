@@ -1,7 +1,11 @@
 import unittest
 from types import SimpleNamespace
 
-from tax_rpa.components.login import LoginComponent
+from tax_rpa.components.login import (
+    DECLARATION_PASSWORD_LOGIN_TEXT,
+    PASSWORD_PLACEHOLDER_TEXT,
+    LoginComponent,
+)
 
 
 class FakeLogger:
@@ -45,7 +49,86 @@ class FakeKeyboard:
             self.events.append(("press", key, presses, interval))
 
 
+class FakeUia:
+    def __init__(self, enabled=True, events=None) -> None:
+        self.enabled = enabled
+        self.events = events
+        self.invoke_calls = []
+        self.focus_calls = []
+
+    def invoke_text(self, hwnd, text, artifact_name):
+        self.invoke_calls.append((hwnd, text, artifact_name))
+        if self.events is not None:
+            self.events.append(("uia_invoke", text))
+        if not self.enabled:
+            return None
+        return {"source": "uia", "action": "invoke", "label": text}
+
+    def focus_text(self, hwnd, text, artifact_name):
+        self.focus_calls.append((hwnd, text, artifact_name))
+        if self.events is not None:
+            self.events.append(("uia_focus", text))
+        if not self.enabled:
+            return None
+        return {"source": "uia", "action": "focus", "label": text}
+
+
 class LoginComponentTests(unittest.TestCase):
+    def test_declaration_password_login_uses_uia_before_ocr_when_available(self):
+        logger = FakeLogger()
+        ocr = FakeOcr()
+        keyboard = FakeKeyboard()
+        uia = FakeUia(enabled=True)
+        component = LoginComponent(
+            hwnd=100,
+            window_rect=[0, 0, 800, 600],
+            logger=logger,
+            config=SimpleNamespace(ocr_score_threshold=0.35, dry_run=False),
+            ocr=ocr,
+            keyboard=keyboard,
+            uia=uia,
+        )
+
+        result = component.login_with_declaration_password("secret-password")
+
+        self.assertTrue(result.ok)
+        self.assertEqual(ocr.clicks, [])
+        self.assertEqual(
+            uia.invoke_calls,
+            [(100, DECLARATION_PASSWORD_LOGIN_TEXT, "login_method_declaration_password")],
+        )
+        self.assertEqual(
+            uia.focus_calls,
+            [(100, PASSWORD_PLACEHOLDER_TEXT, "login_password_field")],
+        )
+        self.assertEqual(result.evidence["method_click"]["source"], "uia")
+        self.assertEqual(result.evidence["password_field_click"]["source"], "uia")
+
+    def test_declaration_password_login_falls_back_to_ocr_when_uia_is_unavailable(self):
+        logger = FakeLogger()
+        ocr = FakeOcr()
+        keyboard = FakeKeyboard()
+        uia = FakeUia(enabled=False)
+        component = LoginComponent(
+            hwnd=100,
+            window_rect=[0, 0, 800, 600],
+            logger=logger,
+            config=SimpleNamespace(ocr_score_threshold=0.35, dry_run=False),
+            ocr=ocr,
+            keyboard=keyboard,
+            uia=uia,
+        )
+
+        result = component.login_with_declaration_password("secret-password")
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            [click[1] for click in ocr.clicks],
+            [DECLARATION_PASSWORD_LOGIN_TEXT, PASSWORD_PLACEHOLDER_TEXT],
+        )
+        self.assertEqual(len(uia.invoke_calls), 1)
+        self.assertEqual(len(uia.focus_calls), 1)
+
     def test_declaration_password_login_selects_method_enters_password_and_submits_with_enter(self):
         logger = FakeLogger()
         ocr = FakeOcr()
@@ -57,6 +140,7 @@ class LoginComponentTests(unittest.TestCase):
             config=SimpleNamespace(ocr_score_threshold=0.35, dry_run=False),
             ocr=ocr,
             keyboard=keyboard,
+            uia=FakeUia(enabled=False),
         )
 
         result = component.login_with_declaration_password("secret-password")
@@ -82,6 +166,7 @@ class LoginComponentTests(unittest.TestCase):
             config=SimpleNamespace(ocr_score_threshold=0.35, dry_run=False),
             ocr=ocr,
             keyboard=keyboard,
+            uia=FakeUia(enabled=False),
         )
 
         component.login_with_declaration_password("secret-password")
@@ -104,6 +189,7 @@ class LoginComponentTests(unittest.TestCase):
             config=SimpleNamespace(ocr_score_threshold=0.35, dry_run=False),
             ocr=FakeOcr(),
             keyboard=FakeKeyboard(),
+            uia=FakeUia(enabled=False),
         )
 
         result = component.login_with_declaration_password("secret-password")

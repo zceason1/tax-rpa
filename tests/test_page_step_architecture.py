@@ -57,6 +57,20 @@ class FakeWaitImportResultStep:
         return StepResult(ok=True, name="person_info.wait_import_result", status="wait_import_result")
 
 
+class FakeSubmitImportDataStep:
+    def __init__(self, page):
+        self.page = page
+
+    def run(self):
+        return StepResult(
+            ok=True,
+            name="person_info.submit_import_data",
+            status="submit_import_data",
+            side_effect_started=True,
+            side_effect_committed=True,
+        )
+
+
 class PageStepArchitectureTests(unittest.TestCase):
     def test_person_info_modules_exist_at_page_step_paths(self):
         modules = [
@@ -69,6 +83,7 @@ class PageStepArchitectureTests(unittest.TestCase):
             "tax_rpa.pages.person_info.steps.open_page",
             "tax_rpa.pages.person_info.steps.import_person_file",
             "tax_rpa.pages.person_info.steps.wait_import_result",
+            "tax_rpa.pages.person_info.steps.submit_import_data",
         ]
 
         for module_name in modules:
@@ -148,6 +163,135 @@ class PageStepArchitectureTests(unittest.TestCase):
                 "wait_login",
                 "open_person_page",
                 "import_person_file:persons.xlsx",
+                "wait_import_result",
+            ],
+        )
+
+    def test_workflow_submits_validated_person_info_before_final_result(self):
+        events = []
+
+        class RecordingOpenStep(FakeOpenPersonInfoPageStep):
+            def run(self):
+                events.append("open_person_page")
+                return super().run()
+
+        class RecordingImportStep(FakeImportPersonFileStep):
+            def run(self, path):
+                result = super().run(path)
+                events.append(result.status)
+                return result
+
+        class RecordingWaitStep:
+            wait_count = 0
+
+            def __init__(self, page):
+                self.page = page
+
+            def run(self):
+                RecordingWaitStep.wait_count += 1
+                status = "ready_to_submit" if RecordingWaitStep.wait_count == 1 else "success"
+                events.append("wait_import_result")
+                return StepResult(
+                    ok=True,
+                    name="person_info.wait_import_result",
+                    status=status,
+                )
+
+        class RecordingSubmitStep(FakeSubmitImportDataStep):
+            def run(self):
+                result = super().run()
+                events.append(result.status)
+                return result
+
+        config = PersonImportConfig(person_info_file=Path("persons.xlsx"))
+        workflow = ImportPersonInfoWorkflow(
+            config=config,
+            logger=None,
+            app_factory=lambda config, logger: FakeApp(events),
+        )
+
+        with (
+            patch("tax_rpa.workflows.import_person_info_workflow.OpenPersonInfoPageStep", RecordingOpenStep),
+            patch("tax_rpa.workflows.import_person_info_workflow.ImportPersonFileStep", RecordingImportStep),
+            patch("tax_rpa.workflows.import_person_info_workflow.WaitImportResultStep", RecordingWaitStep),
+            patch("tax_rpa.workflows.import_person_info_workflow.SubmitImportDataStep", RecordingSubmitStep),
+        ):
+            result = workflow.run()
+
+        self.assertTrue(result.ok)
+        self.assertEqual(
+            events,
+            [
+                "start",
+                "wait_login",
+                "open_person_page",
+                "import_person_file:persons.xlsx",
+                "wait_import_result",
+                "submit_import_data",
+                "wait_import_result",
+            ],
+        )
+
+    def test_workflow_stops_when_submit_data_does_not_finalize_import(self):
+        events = []
+
+        class RecordingOpenStep(FakeOpenPersonInfoPageStep):
+            def run(self):
+                events.append("open_person_page")
+                return super().run()
+
+        class RecordingImportStep(FakeImportPersonFileStep):
+            def run(self, path):
+                result = super().run(path)
+                events.append(result.status)
+                return result
+
+        class RecordingWaitStep:
+            def __init__(self, page):
+                self.page = page
+
+            def run(self):
+                events.append("wait_import_result")
+                return StepResult(
+                    ok=True,
+                    name="person_info.wait_import_result",
+                    status="ready_to_submit",
+                )
+
+        class RecordingSubmitStep(FakeSubmitImportDataStep):
+            def run(self):
+                result = super().run()
+                events.append(result.status)
+                return result
+
+        config = PersonImportConfig(person_info_file=Path("persons.xlsx"))
+        workflow = ImportPersonInfoWorkflow(
+            config=config,
+            logger=None,
+            app_factory=lambda config, logger: FakeApp(events),
+        )
+
+        with (
+            patch("tax_rpa.workflows.import_person_info_workflow.OpenPersonInfoPageStep", RecordingOpenStep),
+            patch("tax_rpa.workflows.import_person_info_workflow.ImportPersonFileStep", RecordingImportStep),
+            patch("tax_rpa.workflows.import_person_info_workflow.WaitImportResultStep", RecordingWaitStep),
+            patch("tax_rpa.workflows.import_person_info_workflow.SubmitImportDataStep", RecordingSubmitStep),
+        ):
+            result = workflow.run()
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.status, "unknown")
+        self.assertEqual(result.error_type, "UNKNOWN_RESULT")
+        self.assertEqual(result.error_code, "person_import_result_unknown")
+        self.assertEqual(
+            events,
+            [
+                "start",
+                "wait_login",
+                "open_person_page",
+                "import_person_file:persons.xlsx",
+                "wait_import_result",
+                "submit_import_data",
                 "wait_import_result",
             ],
         )

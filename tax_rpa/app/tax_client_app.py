@@ -1,4 +1,5 @@
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -10,12 +11,24 @@ from tax_rpa.runtime.context import RpaContext
 from tax_rpa.runtime.result import StepResult
 
 
+AUTO_LOGIN_MAX_FAILURES = 3
+LOGIN_WINDOW_CLASSES = ("Tfrm_LoginViewer",)
+
+
 def build_launch_decision(pids: list[int], app_path: Path | None) -> dict[str, Any]:
     if pids:
         return {"action": "reuse_running_process", "pids": pids}
     if app_path is None:
         return {"action": "missing_app_path"}
     return {"action": "launch", "app_path": str(Path(app_path))}
+
+
+def choose_login_window(windows: list[dict[str, Any]]) -> dict[str, Any]:
+    for class_name in LOGIN_WINDOW_CLASSES:
+        for window in windows:
+            if window.get("class") == class_name:
+                return window
+    return windows[0]
 
 
 class TaxClientApp:
@@ -91,6 +104,7 @@ class TaxClientApp:
         last_error = None
         last_log_at = 0.0
         auto_login_attempted = False
+        auto_login_failures = 0
         while time.time() < deadline:
             pids = self.win32.find_process_ids(self.config.process_name)
             if pids:
@@ -112,16 +126,48 @@ class TaxClientApp:
                             auto_login = self._try_auto_login(pids)
                         except Exception as login_exc:
                             last_error = str(login_exc)
+                            auto_login_failures += 1
                             self.logger.log(
                                 "auto_login",
                                 "not_ready",
                                 error=str(login_exc),
+                                attempts=auto_login_failures,
+                                max_attempts=AUTO_LOGIN_MAX_FAILURES,
                                 pids=pids,
                             )
+                            if auto_login_failures >= AUTO_LOGIN_MAX_FAILURES:
+                                error = (
+                                    "Auto login failed after "
+                                    f"{auto_login_failures} attempts: unable to find or click "
+                                    f"the configured login element. Last error: {last_error}"
+                                )
+                                self.logger.log(
+                                    "auto_login",
+                                    "failed",
+                                    error=error,
+                                    attempts=auto_login_failures,
+                                    pids=pids,
+                                )
+                                return StepResult(
+                                    ok=False,
+                                    name="tax_client_app.wait_for_login",
+                                    status="auto_login_failed",
+                                    evidence={
+                                        "attempts": auto_login_failures,
+                                        "max_attempts": AUTO_LOGIN_MAX_FAILURES,
+                                        "last_error": last_error,
+                                        "pids": pids,
+                                    },
+                                    error=error,
+                                    error_type="LOGIN_FAILED",
+                                    error_code="auto_login_element_not_found",
+                                )
                         else:
                             auto_login_attempted = (
                                 auto_login is not None and auto_login.ok
                             )
+                            if auto_login_attempted:
+                                auto_login_failures = 0
 
             now = time.time()
             if now - last_log_at >= 10:
@@ -154,13 +200,13 @@ class TaxClientApp:
             self.logger.log("auto_login", "no_login_window", pids=pids)
             return None
 
-        login_window = windows[0]
+        login_window = choose_login_window(windows)
         self.win32.set_foreground(login_window["hwnd"])
         result = LoginComponent(
             hwnd=login_window["hwnd"],
             window_rect=login_window["rect"],
             logger=self.logger,
-            config=self.config,
+            config=replace(self.config, dry_run=False),
         ).login_with_declaration_password(password)
         self.logger.log(
             "auto_login",

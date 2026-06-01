@@ -176,6 +176,36 @@ class PersonImportConfigTests(unittest.TestCase):
             self.assertEqual(config.import_file("salary_income"), salary_file.resolve())
             self.assertEqual(config.imports["salary_income"].file, salary_file.resolve())
 
+    def test_default_config_provides_full_workflow_import_files(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            data_dir = root / "data"
+            data_dir.mkdir()
+            person_file = data_dir / "person_import_probe.xlsx"
+            salary_file = data_dir / "salary_income_import.xlsx"
+            person_file.write_bytes(b"placeholder")
+            salary_file.write_bytes(b"placeholder")
+            config_path = root / "person_import.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "person_info_file": "data/person_import_probe.xlsx",
+                        "imports": {
+                            "person_info": {"file": "data/person_import_probe.xlsx"},
+                            "salary_income": {"file": "data/salary_income_import.xlsx"},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            config = load_import_config(config_path)
+
+            self.assertEqual(config.import_file("person_info").name, "person_import_probe.xlsx")
+            self.assertEqual(config.import_file("salary_income").name, "salary_income_import.xlsx")
+
     def test_import_file_rejects_unknown_import_location(self):
         import tempfile
 

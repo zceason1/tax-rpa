@@ -5,6 +5,7 @@ from tax_rpa.config.person_import import assert_safe_action
 from tax_rpa.drivers.ocr_driver import OcrDriver
 from tax_rpa.drivers.region_driver import RegionDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
+from tax_rpa.jobs.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
 
 
@@ -24,6 +25,7 @@ class LeftNavComponent:
         ocr: OcrDriver | None = None,
         region: RegionDriver | None = None,
         win32: Win32Driver | None = None,
+        action_policy: ActionPolicy | None = None,
     ) -> None:
         self.hwnd = hwnd
         self.logger = logger
@@ -31,8 +33,16 @@ class LeftNavComponent:
         self.ocr = ocr or OcrDriver()
         self.region = region or RegionDriver()
         self.win32 = win32 or Win32Driver()
+        self.action_policy = action_policy or ActionPolicy(run_mode="execute_no_send")
 
     def open_page(self, text: str, ready_check=None) -> StepResult:
+        decision = self.action_policy.before_click(
+            text,
+            {"step_name": "left_nav.open_page"},
+            action_type="navigation",
+        )
+        if not decision.allowed:
+            return decision.to_step_result("left_nav.open_page")
         assert_safe_action(text)
         if ready_check and ready_check():
             return StepResult(ok=True, name="left_nav.open_page", status="already_on_page")

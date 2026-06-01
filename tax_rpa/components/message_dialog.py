@@ -3,6 +3,7 @@ from typing import Any
 from tax_rpa.constants import FILE_DIALOG_TITLE_HINTS
 from tax_rpa.drivers.mouse_driver import MouseDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
+from tax_rpa.jobs.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
 
 CONFIRM_BUTTON_TEXTS = ("确定", "确认", "是", "OK", "Yes")
@@ -98,21 +99,35 @@ class MessageDialogComponent:
         logger: Any,
         dry_run: bool,
         win32: Win32Driver | None = None,
+        mouse: MouseDriver | None = None,
+        action_policy: ActionPolicy | None = None,
     ) -> None:
         self.allowed_pids = allowed_pids
         self.logger = logger
         self.dry_run = dry_run
         self.win32 = win32 or Win32Driver()
+        self.mouse = mouse
+        self.action_policy = action_policy or ActionPolicy(run_mode="execute_no_send")
 
     def close_if_present(self) -> StepResult:
         return self.close_with_action("escape")
 
     def close_with_action(self, action: DialogAction) -> StepResult:
+        action_type = "dialog_confirm" if action == "confirm" else "read_only_click"
+        decision = self.action_policy.before_action(
+            label=f"dialog_{action}",
+            action_type=action_type,
+            context={"step_name": "message_dialog.close_if_present"},
+        )
+        if not decision.allowed:
+            return decision.to_step_result("message_dialog.close_if_present")
+        effective_dry_run = self.dry_run and action != "cancel"
         closed = close_blocking_dialogs(
             self.allowed_pids,
             self.logger,
-            self.dry_run,
+            effective_dry_run,
             action=action,
+            mouse=self.mouse,
             win32=self.win32,
         )
         return StepResult(

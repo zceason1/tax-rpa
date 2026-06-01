@@ -304,6 +304,61 @@ class DriverBoundaryTests(unittest.TestCase):
         self.assertEqual(result.status, "none")
         self.assertEqual(calls, [("collect_top_windows",), ("collect_window_texts", 200)])
 
+    def test_message_dialog_cancel_closes_even_when_workflow_is_dry_run(self):
+        class FakeWin32:
+            def __init__(self):
+                self.top_calls = 0
+
+            def collect_top_windows(self):
+                self.top_calls += 1
+                if self.top_calls > 1:
+                    return []
+                return [
+                    {
+                        "hwnd": 200,
+                        "pid": 10,
+                        "class": "Tfrm_MsgDlgRich",
+                        "title": "message",
+                        "area": 12000,
+                        "rect": [0, 0, 200, 120],
+                    }
+                ]
+
+            def collect_window_texts(self, hwnd):
+                return ["message"]
+
+            def collect_children(self, hwnd):
+                return [
+                    {"hwnd": 31, "class": "Button", "title": "取消", "visible": True, "rect": [10, 20, 80, 50]},
+                ]
+
+            def set_foreground(self, hwnd):
+                pass
+
+            def find_button_by_labels(self, children, labels):
+                for child in children:
+                    if child["title"] in labels:
+                        return child
+                return None
+
+            def rect_center(self, rect):
+                return [45, 35]
+
+        mouse = FakeMouse()
+        component = MessageDialogComponent(
+            allowed_pids={10},
+            logger=FakeLogger(),
+            dry_run=True,
+            mouse=mouse,
+            win32=FakeWin32(),
+        )
+
+        result = component.close_with_action("cancel")
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.status, "closed")
+        self.assertEqual(mouse.clicked, [[45, 35]])
+
     def test_message_dialog_clicks_confirm_button_when_requested(self):
         calls = []
 

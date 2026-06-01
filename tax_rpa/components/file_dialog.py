@@ -5,6 +5,7 @@ from tax_rpa.constants import OPEN_BUTTON_TEXTS
 from tax_rpa.config.person_import import assert_safe_action
 from tax_rpa.drivers.mouse_driver import MouseDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
+from tax_rpa.jobs.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
 
 
@@ -16,14 +17,23 @@ class FileDialogComponent:
         dry_run: bool,
         mouse: MouseDriver | None = None,
         win32: Win32Driver | None = None,
+        action_policy: ActionPolicy | None = None,
     ) -> None:
         self.dialog = dialog
         self.logger = logger
         self.dry_run = dry_run
         self.mouse = mouse or MouseDriver()
         self.win32 = win32 or Win32Driver()
+        self.action_policy = action_policy or ActionPolicy(run_mode="execute_no_send")
 
     def choose_file(self, path: Path) -> StepResult:
+        decision = self.action_policy.before_action(
+            label="open file",
+            action_type="file_submit",
+            context={"step_name": "file_dialog.choose_file"},
+        )
+        if not decision.allowed:
+            return decision.to_step_result("file_dialog.choose_file")
         assert_safe_action("打开")
         dialog_hwnd = self.dialog["hwnd"]
         self.logger.screenshot("file_dialog", self.dialog["rect"])

@@ -47,5 +47,9 @@ class ImportPersonFileStep:
                 "message_dialog": message_result,
             },
             error=file_result.error,
+            error_type=file_result.error_type,
+            error_code=file_result.error_code,
+            side_effect_started=file_result.ok or file_result.side_effect_started,
+            side_effect_committed=file_result.ok or file_result.side_effect_committed,
+            retry_allowed=False if file_result.ok else file_result.retry_allowed,
         )
-

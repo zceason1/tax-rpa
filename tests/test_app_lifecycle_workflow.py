@@ -74,6 +74,41 @@ class AppLifecycleWorkflowTests(unittest.TestCase):
         self.assertNotIn("app", result.evidence)
         self.assertIsNotNone(workflow.app)
 
+    def test_lifecycle_propagates_login_failure_details(self):
+        class LoginFailureApp(FakeLifecycleApp):
+            def wait_for_login(self):
+                self.events.append("wait_login")
+                return StepResult(
+                    ok=False,
+                    name="wait_login",
+                    status="auto_login_failed",
+                    evidence={"last_error": "OCR did not find text '申报密码登录'"},
+                    error="Auto login failed after 3 attempts",
+                    error_type="LOGIN_FAILED",
+                    error_code="auto_login_element_not_found",
+                )
+
+        events = []
+        config = PersonImportConfig(person_info_file=Path("persons.xlsx"))
+        workflow = AppLifecycleWorkflow(
+            config=config,
+            logger=None,
+            reset=False,
+            app_factory=lambda config, logger: LoginFailureApp(events),
+        )
+
+        result = workflow.run()
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.status, "auto_login_failed")
+        self.assertEqual(result.error, "Auto login failed after 3 attempts")
+        self.assertEqual(result.error_type, "LOGIN_FAILED")
+        self.assertEqual(result.error_code, "auto_login_element_not_found")
+        self.assertEqual(
+            result.evidence["last_error"],
+            "OCR did not find text '申报密码登录'",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

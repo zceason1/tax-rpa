@@ -87,8 +87,9 @@ def configure_base_process_name(process_name: str) -> None:
 def run_from_zero(
     config: PersonImportConfig,
     logger: RunLogger,
+    reset: bool = False,
 ) -> dict[str, Any]:
-    workflow = ImportPersonInfoWorkflow(config, logger)
+    workflow = ImportPersonInfoWorkflow(config, logger, reset=reset)
     workflow_result = workflow.run()
     if not workflow_result.ok:
         raise RuntimeError(workflow_result.error or workflow_result.status)
@@ -232,6 +233,118 @@ class SelfCheckComprehensiveIncomePage:
             evidence={"file_path": str(path)},
         )
 
+    def read_salary_income_import_result(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.wait_salary_income_import_result",
+            status="success",
+        )
+
+    def click_prefill_deduction(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.click_prefill_deduction", status="clicked")
+
+    def read_prefill_confirmation_dialog(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.read_prefill_confirmation_dialog",
+            status="ready",
+            ui_text=["self_check_prefill_confirmation"],
+        )
+
+    def confirm_prefill_options(self, *, allow_skip_personal_pension: bool):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.confirm_prefill_options",
+            status="confirmed",
+            evidence={"allow_skip_personal_pension": allow_skip_personal_pension},
+        )
+
+    def read_prefill_result(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.read_prefill_result", status="success")
+
+    def click_tax_calculation_tab(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.click_tax_calculation_tab", status="clicked")
+
+    def read_tax_calculation_popup(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.read_tax_calculation_popup", status="no_popup")
+
+    def confirm_tax_calculation_popup(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.confirm_tax_calculation_popup",
+            status="confirmed",
+        )
+
+    def read_tax_calculation_result(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.read_tax_calculation_result", status="success")
+
+    def open_declaration_submission_page(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.open_declaration_submission_page",
+            status="ready",
+        )
+
+    def locate_send_declaration_button(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.locate_send_declaration_button",
+            status="ready_to_submit_not_sent",
+        )
+
+    def open_export_report_menu(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(ok=True, name="self_check.open_export_report_menu", status="opened")
+
+    def choose_standard_report_option(self):
+        from tax_rpa.runtime.result import StepResult
+
+        return StepResult(
+            ok=True,
+            name="self_check.choose_standard_report_option",
+            status="selected",
+        )
+
+    def read_export_result(self, *, run_mode: str):
+        from tax_rpa.runtime.result import StepResult
+
+        if run_mode == "execute_no_send":
+            return StepResult(
+                ok=True,
+                name="self_check.read_export_result",
+                status="not_available_before_submit",
+                evidence={"export_status": "not_available_before_submit"},
+            )
+        return StepResult(
+            ok=True,
+            name="self_check.read_export_result",
+            status="exported",
+            evidence={"export_status": "exported"},
+        )
+
 
 def run_self_check(
     config: PersonImportConfig,
@@ -275,6 +388,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run the workflow composition with fake app/page objects to verify the framework wiring.",
     )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Terminate any running client process before launching and waiting for login.",
+    )
     return parser.parse_args()
 
 
@@ -308,7 +426,11 @@ def main() -> None:
         config = load_import_config(args.config)
         if args.dry_run:
             config = with_dry_run(config)
-        summary = run_self_check(config, logger) if args.self_check else run_from_zero(config, logger)
+        summary = (
+            run_self_check(config, logger)
+            if args.self_check
+            else run_from_zero(config, logger, reset=args.reset)
+        )
         summary_path = logger.write_json("summary.json", summary)
         logger.log("done", summary["status"], summary=summary_path)
         print(summary_path)

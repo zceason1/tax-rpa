@@ -124,6 +124,13 @@ class SelfCheckComprehensiveIncomePage:
             evidence={"file_path": str(path)},
         )
 
+    def read_salary_income_import_result(self) -> StepResult:
+        return StepResult(
+            ok=True,
+            name="self_check.wait_salary_income_import_result",
+            status="success",
+        )
+
 
 def run_workflow(
     config: PersonImportConfig,

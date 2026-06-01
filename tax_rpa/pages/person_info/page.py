@@ -11,7 +11,11 @@ from tax_rpa.drivers.region_driver import RegionDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
 from tax_rpa.pages.person_info.components.import_dropdown import ImportDropdownComponent
 from tax_rpa.pages.person_info.components.import_result import ImportResultComponent
-from tax_rpa.pages.person_info.elements.import_menu import IMPORT_BUTTON, IMPORT_FILE_OPTIONS
+from tax_rpa.pages.person_info.elements.import_menu import (
+    IMPORT_BUTTON,
+    IMPORT_FILE_OPTIONS,
+    SUBMIT_DATA_BUTTON,
+)
 from tax_rpa.pages.person_info.elements.page_markers import PERSON_INFO_PAGE_MARKER
 from tax_rpa.pages.shared.dialogs import PageDialogMixin
 from tax_rpa.runtime.context import RpaContext
@@ -89,6 +93,7 @@ class PersonInfoPage(PageDialogMixin):
             self.context.logger,
             self.context.config,
             win32=self.win32,
+            action_policy=self.context.action_policy,
         ).open_page(
             PERSON_INFO_PAGE_MARKER.text,
             ready_check=self.is_ready,
@@ -108,6 +113,7 @@ class PersonInfoPage(PageDialogMixin):
 
     def import_person_file(self, path: Path) -> StepResult:
         from tax_rpa.pages.person_info.steps.import_person_file import ImportPersonFileStep
+        from tax_rpa.pages.person_info.steps.submit_import_data import SubmitImportDataStep
         from tax_rpa.pages.person_info.steps.wait_import_result import WaitImportResultStep
 
         import_file = ImportPersonFileStep(self).run(path)
@@ -120,14 +126,58 @@ class PersonInfoPage(PageDialogMixin):
                 error=import_file.error,
             )
 
-        import_result = WaitImportResultStep(self).run()
-        evidence = {**import_file.evidence, "import_result": import_result}
+        validation_result = WaitImportResultStep(self).run()
+        if validation_result.status == "ready_to_submit":
+            submit_result = SubmitImportDataStep(self).run()
+            if not submit_result.ok:
+                return StepResult(
+                    ok=False,
+                    name="person_info_page.import_person_file",
+                    status=submit_result.status,
+                    evidence={
+                        **import_file.evidence,
+                        "validation_result": validation_result,
+                        "submit_result": submit_result,
+                    },
+                    error=submit_result.error,
+                )
+            import_result = WaitImportResultStep(self).run()
+            if import_result.status == "ready_to_submit":
+                import_result = StepResult(
+                    ok=False,
+                    name=import_result.name,
+                    status="unknown",
+                    evidence={
+                        **import_result.evidence,
+                        "post_submit_status": "ready_to_submit",
+                    },
+                    error="Personnel import remained at submit-data confirmation after submit",
+                    error_type="UNKNOWN_RESULT",
+                    error_code="person_import_result_unknown",
+                    side_effect_started=True,
+                    side_effect_committed=True,
+                    retry_allowed=False,
+                )
+            evidence = {
+                **import_file.evidence,
+                "validation_result": validation_result,
+                "submit_result": submit_result,
+                "import_result": import_result,
+            }
+        else:
+            import_result = validation_result
+            evidence = {**import_file.evidence, "import_result": import_result}
         return StepResult(
             ok=import_result.ok,
             name="person_info_page.import_person_file",
             status=import_result.status,
             evidence=evidence,
             error=import_result.error,
+            error_type=import_result.error_type,
+            error_code=import_result.error_code,
+            side_effect_started=import_result.side_effect_started,
+            side_effect_committed=import_result.side_effect_committed,
+            retry_allowed=import_result.retry_allowed,
         )
 
     def step(self, name: str, **data: Any):
@@ -151,6 +201,11 @@ class PersonInfoPage(PageDialogMixin):
             return self.import_dropdown.choose_item(import_option)
         return self.default_import_dropdown().choose_item(import_option)
 
+    def click_submit_data(self) -> StepResult:
+        if self.toolbar is not None:
+            return self.toolbar.click_button(SUBMIT_DATA_BUTTON.text)
+        return self.default_toolbar().click_button(SUBMIT_DATA_BUTTON.text)
+
     def choose_person_file(
         self,
         path: Path,
@@ -166,6 +221,7 @@ class PersonInfoPage(PageDialogMixin):
             self.context.logger,
             self.context.config.dry_run,
             win32=self.win32,
+            action_policy=self.context.action_policy,
         ).choose_file(path)
 
     def read_import_result(self) -> StepResult:
@@ -185,6 +241,7 @@ class PersonInfoPage(PageDialogMixin):
             self.context.logger,
             self.context.config.ocr_score_threshold,
             self.context.config.dry_run,
+            action_policy=self.context.action_policy,
         )
 
     def _default_toolbar(self) -> ToolbarComponent:
@@ -200,6 +257,7 @@ class PersonInfoPage(PageDialogMixin):
             self.context.config,
             allowed_pids,
             win32=self.win32,
+            action_policy=self.context.action_policy,
         )
 
     def _default_import_dropdown(self) -> ImportDropdownComponent:
@@ -222,6 +280,9 @@ class PersonInfoPage(PageDialogMixin):
 
     def _choose_import_file_option(self) -> StepResult:
         return self.choose_import_file_option()
+
+    def _click_submit_data(self) -> StepResult:
+        return self.click_submit_data()
 
     def _choose_person_file(self, path: Path, dropdown_result: StepResult) -> StepResult | None:
         return self.choose_person_file(path, dropdown_result)

@@ -22,10 +22,12 @@ class ImportSalaryIncomeWorkflow:
         config: PersonImportConfig,
         logger: Any,
         app_factory: Callable[[PersonImportConfig, Any], Any] | None = None,
+        job_context: Any | None = None,
     ) -> None:
         self.config = config
         self.logger = logger
         self.app_factory = app_factory or (lambda config, logger: TaxClientApp(config, logger))
+        self.job_context = job_context
 
     def run(self) -> WorkflowResult:
         lifecycle = AppLifecycleWorkflow(
@@ -55,12 +57,22 @@ class ImportSalaryIncomeWorkflow:
     def run_on_app(self, app: Any) -> WorkflowResult:
         steps: list[StepResult] = []
         page = OpenComprehensiveIncomePageStep(app.shell()).run()
-        open_form = OpenSalaryIncomeFormStep(page).run()
+        open_form = self._run_step(
+            "comprehensive_income.open_salary_income_form",
+            lambda: OpenSalaryIncomeFormStep(page).run(),
+        )
         steps.append(open_form)
         if not open_form.ok:
             return self._failed(open_form, steps)
 
-        import_file = ImportSalaryIncomeDataStep(page).run(self.config.import_file("salary_income"))
+        import_file = self._run_step(
+            "comprehensive_income.import_salary_income_data",
+            lambda: ImportSalaryIncomeDataStep(page).run(
+                self.config.import_file("salary_income")
+            ),
+            matrix_step="salary_income_import",
+            side_effect_step=True,
+        )
         steps.append(import_file)
 
         return WorkflowResult(
@@ -73,6 +85,11 @@ class ImportSalaryIncomeWorkflow:
                 "import_file": import_file.evidence,
             },
             error=import_file.error,
+            error_type=import_file.error_type,
+            error_code=import_file.error_code,
+            side_effect_started=import_file.side_effect_started,
+            side_effect_committed=import_file.side_effect_committed,
+            retry_allowed=import_file.retry_allowed,
         )
 
     def _failed(self, result: StepResult, steps: list[StepResult]) -> WorkflowResult:
@@ -82,4 +99,27 @@ class ImportSalaryIncomeWorkflow:
             status=result.status,
             steps=steps,
             error=result.error,
+            error_type=result.error_type,
+            error_code=result.error_code,
+            side_effect_started=result.side_effect_started,
+            side_effect_committed=result.side_effect_committed,
+            retry_allowed=result.retry_allowed,
+        )
+
+    def _run_step(
+        self,
+        step: str,
+        operation: Callable[[], StepResult],
+        *,
+        matrix_step: str | None = None,
+        side_effect_step: bool = False,
+    ) -> StepResult:
+        if self.job_context is None:
+            return operation()
+        return self.job_context.run_step(
+            workflow="import_salary_income_workflow",
+            step=step,
+            operation=operation,
+            matrix_step=matrix_step,
+            side_effect_step=side_effect_step,
         )

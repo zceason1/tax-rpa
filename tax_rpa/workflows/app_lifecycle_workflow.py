@@ -55,5 +55,11 @@ class AppLifecycleWorkflow:
             name="app_lifecycle_workflow",
             status=result.status,
             steps=steps,
+            evidence=result.evidence,
             error=result.error,
+            error_type=result.error_type,
+            error_code=result.error_code,
+            side_effect_started=result.side_effect_started,
+            side_effect_committed=result.side_effect_committed,
+            retry_allowed=result.retry_allowed,
         )

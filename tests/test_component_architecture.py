@@ -198,5 +198,42 @@ class ComponentArchitectureTests(unittest.TestCase):
         )
 
 
+class SubmitDataStallTests(unittest.TestCase):
+    def test_person_info_page_stops_when_submit_data_does_not_finalize_import(self):
+        events = []
+        responses = iter(
+            [
+                StepResult(ok=True, name="wait_import_result", status="ready_to_submit"),
+                StepResult(ok=True, name="wait_import_result", status="ready_to_submit"),
+            ]
+        )
+        page = PersonInfoPage(
+            context=None,
+            hwnd=100,
+            toolbar=FakeComponent(events, "toolbar"),
+            import_dropdown=FakeComponent(events, "dropdown"),
+            file_dialog=FakeComponent(events, "file_dialog"),
+            message_dialog=FakeComponent(events, "message_dialog"),
+            import_result_reader=lambda: next(responses),
+        )
+
+        result = page.import_person_file(Path("persons.xlsx"))
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.status, "unknown")
+        self.assertEqual(result.error_type, "UNKNOWN_RESULT")
+        self.assertEqual(result.error_code, "person_import_result_unknown")
+        self.assertEqual(
+            events,
+            [
+                "message_dialog",
+                f"toolbar:{IMPORT_BUTTON_TEXT}",
+                f"dropdown:{IMPORT_OPTION_TEXTS[0]}",
+                "file_dialog:persons.xlsx",
+                "toolbar:提交数据",
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

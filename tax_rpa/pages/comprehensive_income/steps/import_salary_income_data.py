@@ -44,16 +44,43 @@ class ImportSalaryIncomeDataStep:
                     error="Import data file dialog was not opened",
                 )
 
+        if not file_result.ok:
+            return StepResult(
+                ok=False,
+                name="comprehensive_income.import_salary_income_data",
+                status=file_result.status,
+                evidence={
+                    "import_button": import_button_result,
+                    "import_option": import_option_result,
+                    "file_dialog": file_result,
+                },
+                error=file_result.error,
+                error_type=file_result.error_type,
+                error_code=file_result.error_code,
+                side_effect_started=True,
+                side_effect_committed=True,
+                retry_allowed=False,
+            )
+
+        with self.page.step("wait_salary_income_import_result"):
+            import_result = self.page.read_salary_income_import_result()
+
         return StepResult(
-            ok=file_result.ok,
+            ok=import_result.ok,
             name="comprehensive_income.import_salary_income_data",
-            status=file_result.status,
+            status=import_result.status,
             evidence={
                 "import_button": import_button_result,
                 "import_option": import_option_result,
                 "file_dialog": file_result,
+                "import_result": import_result,
             },
-            error=file_result.error,
+            error=import_result.error,
+            error_type=import_result.error_type,
+            error_code=import_result.error_code,
+            side_effect_started=True,
+            side_effect_committed=True,
+            retry_allowed=False,
         )
 
     def _is_dry_run(self) -> bool:

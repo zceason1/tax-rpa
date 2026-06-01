@@ -59,31 +59,44 @@ def to_absolute_mouse_coordinates(point: list[int], screen_size: list[int]) -> l
 
 class MouseDriver:
     def move_to(self, point: list[int], settle_seconds: float = 0.15) -> dict[str, object]:
-        MouseSetCursorPos(int(point[0]), int(point[1]))
-        time.sleep(max(0.0, settle_seconds))
-        actual = get_cursor_point()
-        if point_near(actual, point):
-            return {"requested": point, "actual": actual, "move_method": "SetCursorPos"}
+        attempts = []
+        for _attempt in range(5):
+            MouseSetCursorPos(int(point[0]), int(point[1]))
+            time.sleep(max(0.0, settle_seconds))
+            actual = get_cursor_point()
+            attempts.append({"method": "SetCursorPos", "actual": actual})
+            if point_near(actual, point):
+                return {
+                    "requested": point,
+                    "actual": actual,
+                    "move_method": "SetCursorPos",
+                    "attempts": attempts,
+                }
 
         screen_size = [GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)]
         absolute = to_absolute_mouse_coordinates(point, screen_size)
-        MouseEvent(
-            MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
-            absolute[0],
-            absolute[1],
-            0,
-            None,
-        )
-        time.sleep(max(0.0, settle_seconds))
-        actual = get_cursor_point()
-        if point_near(actual, point):
-            return {
-                "requested": point,
-                "actual": actual,
-                "move_method": "mouse_event_absolute_move",
-            }
+        for _attempt in range(5):
+            MouseEvent(
+                MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
+                absolute[0],
+                absolute[1],
+                0,
+                None,
+            )
+            time.sleep(max(0.0, settle_seconds))
+            actual = get_cursor_point()
+            attempts.append({"method": "mouse_event_absolute_move", "actual": actual})
+            if point_near(actual, point):
+                return {
+                    "requested": point,
+                    "actual": actual,
+                    "move_method": "mouse_event_absolute_move",
+                    "attempts": attempts,
+                }
 
-        raise RuntimeError(f"Cursor did not move to target. expected={point}, actual={actual}")
+        raise RuntimeError(
+            f"Cursor did not move to target. expected={point}, actual={actual}, attempts={attempts}"
+        )
 
     def click(self, point: list[int], press_seconds: float = 0.08) -> dict[str, object]:
         move_result = self.move_to(point)

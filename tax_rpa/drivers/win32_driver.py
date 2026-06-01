@@ -299,6 +299,42 @@ def set_window_text(hwnd: int, text: str) -> None:
     SendMessageW(hwnd, WM_SETTEXT, 0, ctypes.addressof(path_buffer))
 
 
+def unique_pids(pids: list[int]) -> list[int]:
+    seen = set()
+    result = []
+    for pid in pids:
+        if pid in seen:
+            continue
+        seen.add(pid)
+        result.append(pid)
+    return result
+
+
+def split_pids_by_existence(pids: list[int]) -> tuple[list[int], list[int]]:
+    gone = []
+    alive = []
+    for pid in pids:
+        try:
+            exists = psutil.pid_exists(pid)
+        except psutil.Error:
+            exists = True
+        if exists:
+            alive.append(pid)
+        else:
+            gone.append(pid)
+    return gone, alive
+
+
+def process_handles_for_pids(pids: list[int]) -> list[psutil.Process]:
+    processes = []
+    for pid in pids:
+        try:
+            processes.append(psutil.Process(pid))
+        except psutil.NoSuchProcess:
+            pass
+    return processes
+
+
 class Win32Driver:
     def find_process_ids(self, process_name: str) -> list[int]:
         expected = process_name.lower()
@@ -348,29 +384,48 @@ class Win32Driver:
         logger: Any,
     ) -> dict[str, Any]:
         processes = []
+        terminated_pids = []
         for pid in pids:
             try:
                 proc = psutil.Process(pid)
                 proc.terminate()
                 processes.append(proc)
             except psutil.NoSuchProcess:
-                pass
+                terminated_pids.append(pid)
 
-        gone, alive = psutil.wait_procs(processes, timeout=timeout_seconds)
+        try:
+            gone, alive = psutil.wait_procs(processes, timeout=timeout_seconds)
+        except psutil.AccessDenied:
+            gone_pids, alive_pids = split_pids_by_existence([proc.pid for proc in processes])
+            terminated_pids.extend(gone_pids)
+            gone = []
+            alive = process_handles_for_pids(alive_pids)
+        terminated_pids.extend(proc.pid for proc in gone)
         for proc in alive:
             try:
                 proc.kill()
             except psutil.NoSuchProcess:
+                terminated_pids.append(proc.pid)
+            except psutil.AccessDenied:
                 pass
         if alive:
-            gone_after_kill, alive_after_kill = psutil.wait_procs(alive, timeout=5)
-            gone.extend(gone_after_kill)
-            alive = alive_after_kill
+            try:
+                gone_after_kill, alive_after_kill = psutil.wait_procs(alive, timeout=5)
+            except psutil.AccessDenied:
+                gone_pids, alive_pids = split_pids_by_existence([proc.pid for proc in alive])
+                terminated_pids.extend(gone_pids)
+                alive = process_handles_for_pids(alive_pids)
+            else:
+                terminated_pids.extend(proc.pid for proc in gone_after_kill)
+                alive = alive_after_kill
+        gone_pids, alive_pids = split_pids_by_existence([proc.pid for proc in alive])
+        terminated_pids.extend(gone_pids)
+        alive = process_handles_for_pids(alive_pids)
 
         result = {
             "requested": pids,
-            "terminated": [proc.pid for proc in gone],
-            "alive": [proc.pid for proc in alive],
+            "terminated": unique_pids(terminated_pids),
+            "alive": unique_pids([proc.pid for proc in alive]),
             "timeout_seconds": timeout_seconds,
         }
         logger.log(

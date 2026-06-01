@@ -2,6 +2,7 @@ from typing import Any
 
 from tax_rpa.drivers.ocr_driver import OcrDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
+from tax_rpa.jobs.action_policy import ActionPolicy
 from tax_rpa.pages.person_info.elements.import_menu import IMPORT_FILE_OPTIONS
 from tax_rpa.runtime.result import StepResult
 from tax_rpa.utils import normalize_text
@@ -16,6 +17,7 @@ class ImportDropdownComponent:
         allowed_pids: set[int],
         ocr: OcrDriver | None = None,
         win32: Win32Driver | None = None,
+        action_policy: ActionPolicy | None = None,
     ) -> None:
         self.hwnd = hwnd
         self.logger = logger
@@ -23,6 +25,7 @@ class ImportDropdownComponent:
         self.allowed_pids = allowed_pids
         self.ocr = ocr or OcrDriver()
         self.win32 = win32 or Win32Driver()
+        self.action_policy = action_policy or ActionPolicy(run_mode="execute_no_send")
 
     def choose_item(self, text: str) -> StepResult:
         dialog = self.win32.find_file_dialog(
@@ -45,6 +48,13 @@ class ImportDropdownComponent:
         result = None
         for option in (text, *[item for item in option_texts if item != text]):
             try:
+                decision = self.action_policy.before_click(
+                    option,
+                    {"step_name": "import_dropdown.choose_item"},
+                    action_type="import",
+                )
+                if not decision.allowed:
+                    return decision.to_step_result("import_dropdown.choose_item")
                 click_result = self.ocr.click_text(
                     rect,
                     option,

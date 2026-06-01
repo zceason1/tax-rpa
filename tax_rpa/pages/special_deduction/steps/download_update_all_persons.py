@@ -11,11 +11,14 @@ class DownloadUpdateAllPersonsStep:
         self.page = page
 
     def run(self) -> StepResult:
-        with self.page.step("点击下载更新"):
+        with self.page.step("鐐瑰嚮涓嬭浇鏇存柊"):
             download_result = self.page.click_download_update()
 
-        with self.page.step("点击全部人员"):
-            all_persons_result = self.page.click_all_persons()
+        with self.page.step("鐐瑰嚮鍏ㄩ儴浜哄憳"):
+            try:
+                all_persons_result = self.page.click_all_persons()
+            except RuntimeError as exc:
+                all_persons_result = self.page.click_all_persons_fallback(download_result, exc)
 
         ok = download_result.ok and all_persons_result.ok
         return StepResult(
@@ -27,4 +30,9 @@ class DownloadUpdateAllPersonsStep:
                 "all_persons": all_persons_result,
             },
             error=download_result.error or all_persons_result.error,
+            error_type=download_result.error_type or all_persons_result.error_type,
+            error_code=download_result.error_code or all_persons_result.error_code,
+            side_effect_started=all_persons_result.ok or all_persons_result.side_effect_started,
+            side_effect_committed=all_persons_result.ok or all_persons_result.side_effect_committed,
+            retry_allowed=False if all_persons_result.ok else all_persons_result.retry_allowed,
         )

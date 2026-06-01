@@ -22,6 +22,30 @@ MODULE_NAME = "tax_rpa.cli.run_tax_workflow"
 shell32 = ctypes.windll.shell32
 
 
+class WorkflowExecutionError(RuntimeError):
+    def __init__(self, result: Any) -> None:
+        super().__init__(result.error or result.status)
+        self.result = result
+
+
+def failure_payload(exc: Exception) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "error": str(exc),
+        "traceback": traceback.format_exc(),
+    }
+    if isinstance(exc, WorkflowExecutionError):
+        result = exc.result
+        payload.update(
+            {
+                "status": result.status,
+                "error_type": result.error_type,
+                "error_code": result.error_code,
+                "evidence": result.evidence,
+            }
+        )
+    return payload
+
+
 def is_user_admin() -> bool:
     try:
         return bool(shell32.IsUserAnAdmin())
@@ -99,7 +123,7 @@ def run_workflow(
     )
     result = workflow.run()
     if not result.ok:
-        raise RuntimeError(result.error or result.status)
+        raise WorkflowExecutionError(result)
     return {"status": result.status, "workflow": result}
 
 
@@ -124,7 +148,7 @@ def main() -> None:
         print(summary_path)
     except Exception as exc:
         logger.log("run", "failed", error=str(exc), traceback=traceback.format_exc())
-        logger.write_json("failed.json", {"error": str(exc), "traceback": traceback.format_exc()})
+        logger.write_json("failed.json", failure_payload(exc))
         raise
 
 

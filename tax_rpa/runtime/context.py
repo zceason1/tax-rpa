@@ -9,6 +9,7 @@ class RpaContext:
     config: PersonImportConfig
     logger: Any
     main_window: dict[str, Any] | None = None
+    action_policy: Any | None = None
 
     @property
     def hwnd(self) -> int | None:

@@ -24,6 +24,7 @@ class PageDialogMixin:
                 self.context.logger,
                 self.context.config.dry_run,
                 win32=self.win32,
+                action_policy=self.context.action_policy,
             ).close_with_action(action)
             self.win32.set_foreground(self.hwnd)
             return result
