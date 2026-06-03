@@ -2,11 +2,11 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from tax_rpa.components.content_text import ContentTextComponent
-from tax_rpa.components.file_dialog import FileDialogComponent
-from tax_rpa.components.toolbar import ToolbarComponent
-from tax_rpa.jobs.action_policy import ActionPolicy
+from tax_rpa.pages.shared.components.content_text import ContentTextComponent
+from tax_rpa.pages.shared.components.file_dialog import FileDialogComponent
+from tax_rpa.pages.shared.components.toolbar import ToolbarComponent
 from tax_rpa.pages.shared.dialogs import PageDialogMixin
+from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.runtime.context import RpaContext
 
 

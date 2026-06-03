@@ -7,6 +7,7 @@ from tax_rpa.runtime.result import StepResult, WorkflowResult
 
 
 class AppLifecycleWorkflow:
+    """客户端生命周期工作流工作流，负责编排该业务链路的页面步骤和失败结果。"""
     def __init__(
         self,
         config: PersonImportConfig,
@@ -14,6 +15,7 @@ class AppLifecycleWorkflow:
         reset: bool = False,
         app_factory: Callable[[PersonImportConfig, Any], Any] | None = None,
     ) -> None:
+        """初始化客户端生命周期工作流实例，保存依赖、配置和运行上下文。"""
         self.config = config
         self.logger = logger
         self.reset = reset
@@ -21,6 +23,7 @@ class AppLifecycleWorkflow:
         self.app: Any | None = None
 
     def run(self) -> WorkflowResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         steps: list[StepResult] = []
         app = self.app_factory(self.config, self.logger)
         self.app = app
@@ -50,6 +53,7 @@ class AppLifecycleWorkflow:
         )
 
     def _failed(self, result: StepResult, steps: list[StepResult]) -> WorkflowResult:
+        """把失败步骤包装成上层失败结果，并保留已执行步骤证据。"""
         return WorkflowResult(
             ok=False,
             name="app_lifecycle_workflow",

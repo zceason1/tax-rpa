@@ -4,6 +4,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class StepResult:
+    """单个步骤的标准结果对象，记录状态、证据和副作用信息。"""
     ok: bool
     name: str
     status: str
@@ -20,6 +21,7 @@ class StepResult:
 
 @dataclass(frozen=True)
 class WorkflowResult:
+    """工作流的标准结果对象，记录整体状态和步骤链路。"""
     ok: bool
     name: str
     status: str

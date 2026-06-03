@@ -22,6 +22,7 @@ SENSITIVE_KEY_PARTS = (
 
 @dataclass(frozen=True)
 class JobLogContext:
+    """作业log上下文，封装作业、可观测性相关状态和行为。"""
     job_id: str
     idempotency_key: str
     run_mode: str
@@ -38,6 +39,7 @@ class JobLogContext:
         attempt: int | None = None,
         correlation_id: str | None = None,
     ) -> "JobLogContext":
+        """基于现有作业上下文派生步骤级上下文。"""
         return dataclasses.replace(
             self,
             workflow=workflow or self.workflow,
@@ -48,6 +50,7 @@ class JobLogContext:
 
 
 class JobObservability:
+    """作业可观测性工具，负责结构化日志、截图和故障包。"""
     def __init__(
         self,
         *,
@@ -55,11 +58,13 @@ class JobObservability:
         context: JobLogContext,
         screenshot_grabber: Any | None = None,
     ) -> None:
+        """初始化作业可观测性实例，保存依赖、配置和运行上下文。"""
         self.artifacts = artifacts
         self.context = context
         self.screenshot_grabber = screenshot_grabber
 
     def with_context(self, context: JobLogContext) -> "JobObservability":
+        """基于现有观测器派生带新作业上下文的观测器。"""
         return JobObservability(
             artifacts=self.artifacts,
             context=context,
@@ -67,34 +72,44 @@ class JobObservability:
         )
 
     def log_job_event(self, event: str, status: str, **data: Any) -> None:
+        """记录作业级事件。"""
         self._write_jsonl("job_events", event, status, data)
 
     def log_step(self, event: str, status: str, **data: Any) -> None:
+        """记录步骤级事件。"""
         self._write_jsonl("steps", event, status, data)
 
     def write_step_journal(self, event: str, status: str, **data: Any) -> None:
+        """写入步骤流水日志，记录步骤开始、完成或失败。"""
         self._write_jsonl("step_journal", event, status, data)
 
     def log_action(self, event: str, status: str, **data: Any) -> None:
+        """记录 UI 动作事件。"""
         self._write_jsonl("actions", event, status, data)
 
     def log_ocr(self, event: str, status: str, **data: Any) -> None:
+        """记录 OCR 识别事件。"""
         self._write_jsonl("ocr", event, status, data)
 
     def log_dialog(self, event: str, status: str, **data: Any) -> None:
+        """记录弹窗处理事件。"""
         self._write_jsonl("dialogs", event, status, data)
 
     def log_window(self, event: str, status: str, **data: Any) -> None:
+        """记录窗口发现和切换事件。"""
         self._write_jsonl("windows", event, status, data)
 
     def log_preflight(self, event: str, status: str, **data: Any) -> None:
+        """记录预检事件。"""
         self._write_jsonl("preflight", event, status, data)
 
     def write_ocr_json(self, correlation_id: str, data: dict[str, Any]) -> str:
+        """写入 OCR 识别详情 JSON。"""
         filename = f"{_safe_filename(correlation_id)}.json"
         return self.artifacts.write_json(Path("ocr") / filename, data)
 
     def capture_full_screen(self, name: str) -> str | None:
+        """截取全屏截图并写入作业截图目录。"""
         self.artifacts.screenshots_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{_safe_filename(name)}.png"
         target = self.artifacts.screenshots_dir / filename
@@ -129,6 +144,7 @@ class JobObservability:
         traceback_text: str | None,
         primary_failure_screenshot: str | None,
     ) -> str:
+        """生成故障排查包，汇总截图、日志和最近事件。"""
         failed = {
             **self._context_fields(),
             "error": error,
@@ -155,6 +171,7 @@ class JobObservability:
         exported_files: list[str] | None = None,
         callback_outbox_record: str | None = None,
     ) -> str:
+        """写入故障排查索引，帮助快速定位失败现场。"""
         latest_action = self._latest_event("actions")
         latest_ocr = self._latest_event("ocr")
         latest_dialog = self._latest_event("dialogs")
@@ -193,6 +210,7 @@ class JobObservability:
         status: str,
         data: dict[str, Any],
     ) -> None:
+        """向 JSONL 日志文件追加一条结构化事件。"""
         self.artifacts.logs_dir.mkdir(parents=True, exist_ok=True)
         item = {
             "time": _now(),
@@ -206,6 +224,7 @@ class JobObservability:
             stream.write(json.dumps(_redact(item), ensure_ascii=False) + "\n")
 
     def _context_fields(self) -> dict[str, Any]:
+        """生成当前观测上下文的公共字段。"""
         return {
             "job_id": self.context.job_id,
             "idempotency_key": self.context.idempotency_key,
@@ -217,6 +236,7 @@ class JobObservability:
         }
 
     def _latest_full_screen_screenshot(self) -> str | None:
+        """查找最近一次全屏截图路径。"""
         for event in reversed(self._events("job_events")):
             if (
                 event.get("event") == "screenshot_captured"
@@ -226,10 +246,12 @@ class JobObservability:
         return None
 
     def _latest_event(self, log_name: str) -> dict[str, Any] | None:
+        """读取指定日志中的最近一条事件。"""
         events = self._events(log_name)
         return events[-1] if events else None
 
     def _events(self, log_name: str) -> list[dict[str, Any]]:
+        """读取指定 JSONL 日志中的全部事件。"""
         path = self.artifacts.logs_dir / f"{log_name}.jsonl"
         if not path.exists():
             return []
@@ -241,12 +263,14 @@ class JobObservability:
         return events
 
     def _read_json_if_exists(self, relative_path: str) -> dict[str, Any] | None:
+        """在文件存在时读取 JSON，不存在时返回空结果。"""
         path = self.artifacts.root / relative_path
         if not path.exists():
             return None
         return json.loads(path.read_text(encoding="utf-8"))
 
     def _relative_files(self, directory: Path) -> list[str]:
+        """列出目录下相对作业根目录的文件路径。"""
         if not directory.exists():
             return []
         return [
@@ -257,27 +281,32 @@ class JobObservability:
 
 
 def _now() -> str:
+    """生成当前 UTC 时间字符串，供状态和日志落盘使用。"""
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def _grab_full_screen(path: Path) -> None:
+    """执行作业、可观测性中的内部辅助逻辑：grabfull屏幕。"""
     from PIL import ImageGrab
 
     ImageGrab.grab().save(path)
 
 
 def _safe_filename(value: str) -> str:
+    """安全处理filename，异常时返回可控默认值。"""
     cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip())
     return cleaned.strip("._") or "screenshot"
 
 
 def _read_key(event: dict[str, Any] | None, key: str) -> Any | None:
+    """读取key，并处理缺失或异常情况。"""
     if event is None:
         return None
     return event.get(key)
 
 
 def _redact(value: Any, key: str | None = None) -> Any:
+    """执行作业、可观测性中的内部辅助逻辑：redact。"""
     if key is not None and _is_sensitive_key(key):
         return "[REDACTED]"
     if dataclasses.is_dataclass(value):
@@ -292,5 +321,6 @@ def _redact(value: Any, key: str | None = None) -> Any:
 
 
 def _is_sensitive_key(key: str) -> bool:
+    """判断字段名是否属于敏感信息。"""
     normalized = key.lower()
     return any(part in normalized for part in SENSITIVE_KEY_PARTS)

@@ -4,10 +4,10 @@ from pathlib import Path
 
 from tax_rpa.config.person_import import (
     PersonImportConfigError,
-    assert_safe_action,
     load_import_config,
     validate_excel_path,
 )
+from tax_rpa.runtime.action_guard import UnsafeActionError, assert_safe_action
 
 
 class PersonImportConfigTests(unittest.TestCase):
@@ -274,10 +274,10 @@ class PersonImportConfigTests(unittest.TestCase):
                 validate_excel_path(text_file)
 
     def test_assert_safe_action_blocks_report_submit_actions(self):
-        with self.assertRaisesRegex(PersonImportConfigError, "forbidden"):
+        with self.assertRaisesRegex(UnsafeActionError, "forbidden"):
             assert_safe_action("报送")
 
-        with self.assertRaisesRegex(PersonImportConfigError, "forbidden"):
+        with self.assertRaisesRegex(UnsafeActionError, "forbidden"):
             assert_safe_action("发送申报")
 
     def test_assert_safe_action_allows_import_actions(self):

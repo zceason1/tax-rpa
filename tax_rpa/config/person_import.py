@@ -5,37 +5,28 @@ from typing import Any
 
 
 class PersonImportConfigError(ValueError):
-    """Raised when the bounded personnel import POC is configured unsafely."""
+    """人员导入配置错误异常，表示配置、人员导入中的特定错误场景。"""
 
 
 EXCEL_SUFFIXES = {".xlsx", ".xls", ".xlsm"}
-ALLOWED_ACTION_LABELS = {
-    "申报密码登录",
-    "综合所得申报",
-}
-FORBIDDEN_ACTION_KEYWORDS = (
-    "报送",
-    "发送申报",
-    "申报",
-    "缴款",
-    "缴纳",
-    "税款缴纳",
-)
 
 
 @dataclass(frozen=True)
 class ImportFileConfig:
+    """导入文件配置配置对象，承载运行当前流程所需的配置项。"""
     file: Path
 
 
 @dataclass(frozen=True)
 class LoginConfig:
+    """登录配置配置对象，承载运行当前流程所需的配置项。"""
     method: str = "申报密码登录"
     declaration_password: str | None = None
 
 
 @dataclass(frozen=True)
 class PersonImportConfig:
+    """人员导入配置配置对象，承载运行当前流程所需的配置项。"""
     person_info_file: Path
     app_path: Path | None = None
     process_name: str = "EPPortalITS.exe"
@@ -51,6 +42,7 @@ class PersonImportConfig:
     login: LoginConfig = field(default_factory=LoginConfig)
 
     def import_file(self, location: str) -> Path:
+        """按业务位置读取对应的导入文件路径。"""
         if location in self.imports:
             return validate_excel_path(self.imports[location].file)
         if location == "person_info":
@@ -59,6 +51,7 @@ class PersonImportConfig:
 
 
 def validate_excel_path(path: str | Path) -> Path:
+    """校验路径存在且是 Excel 文件，返回规范化路径。"""
     excel_path = Path(path).expanduser()
     if not excel_path.exists():
         raise FileNotFoundError(f"Personnel import file does not exist: {excel_path}")
@@ -72,6 +65,7 @@ def validate_excel_path(path: str | Path) -> Path:
 
 
 def validate_app_path(path: str | Path) -> Path:
+    """校验客户端启动路径存在，返回规范化路径。"""
     app_path = Path(path).expanduser()
     if not app_path.exists():
         raise FileNotFoundError(f"Client app path does not exist: {app_path}")
@@ -82,19 +76,8 @@ def validate_app_path(path: str | Path) -> Path:
     return app_path.resolve()
 
 
-def assert_safe_action(label: str) -> None:
-    normalized = "".join(str(label).split())
-    allowed = {"".join(item.split()) for item in ALLOWED_ACTION_LABELS}
-    if normalized in allowed:
-        return
-    for keyword in FORBIDDEN_ACTION_KEYWORDS:
-        if keyword in normalized:
-            raise PersonImportConfigError(
-                f"Action is forbidden in the personnel import POC: {label}"
-            )
-
-
 def _read_int(data: dict[str, Any], key: str, default: int) -> int:
+    """从配置字典读取整数值，并在缺失时使用默认值。"""
     value = data.get(key, default)
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise PersonImportConfigError(f"{key} must be a positive integer")
@@ -102,6 +85,7 @@ def _read_int(data: dict[str, Any], key: str, default: int) -> int:
 
 
 def _read_float(data: dict[str, Any], key: str, default: float) -> float:
+    """从配置字典读取浮点值，并在缺失时使用默认值。"""
     value = data.get(key, default)
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
         raise PersonImportConfigError(f"{key} must be a positive number")
@@ -109,6 +93,7 @@ def _read_float(data: dict[str, Any], key: str, default: float) -> float:
 
 
 def _read_str(data: dict[str, Any], key: str, default: str) -> str:
+    """从配置字典读取字符串值，并在缺失时使用默认值。"""
     value = data.get(key, default)
     if not isinstance(value, str) or not value.strip():
         raise PersonImportConfigError(f"{key} must be a non-empty string")
@@ -116,6 +101,7 @@ def _read_str(data: dict[str, Any], key: str, default: str) -> str:
 
 
 def _resolve_config_relative_path(config_path: Path, raw_path: str) -> Path:
+    """把配置文件中的相对路径解析为绝对路径。"""
     candidate = Path(raw_path).expanduser()
     if not candidate.is_absolute():
         candidate = config_path.parent / candidate
@@ -127,6 +113,7 @@ def _read_imports(
     config_path: Path,
     person_info_file: Path,
 ) -> dict[str, ImportFileConfig]:
+    """读取命名导入文件配置，并校验必要导入文件。"""
     raw_imports = data.get("imports", {})
     if raw_imports is None:
         raw_imports = {}
@@ -153,6 +140,7 @@ def _read_imports(
 
 
 def _read_login(data: dict[str, Any]) -> LoginConfig:
+    """读取登录配置，并规范化登录方式、密码和超时时间。"""
     raw_login = data.get("login", {})
     if raw_login is None:
         raw_login = {}
@@ -178,6 +166,7 @@ def _read_login(data: dict[str, Any]) -> LoginConfig:
 
 
 def load_import_config(path: str | Path) -> PersonImportConfig:
+    """读取人员导入配置文件，并转换成运行时配置对象。"""
     config_path = Path(path).expanduser().resolve()
     if not config_path.exists():
         raise FileNotFoundError(f"Import config does not exist: {config_path}")

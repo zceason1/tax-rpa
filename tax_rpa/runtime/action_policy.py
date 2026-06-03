@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from tax_rpa.runtime.result import StepResult
-from tax_rpa.utils import normalize_text
+from tax_rpa.runtime.text import normalize_text
 
 
 RUN_MODES = {"inspect_only", "execute_no_send", "submit"}
@@ -32,6 +32,7 @@ HIGH_RISK_LABELS = {
 
 @dataclass(frozen=True)
 class ActionDecision:
+    """动作策略判断结果，记录是否允许、原因和审计证据。"""
     allowed: bool
     label: str
     action_type: str
@@ -42,6 +43,7 @@ class ActionDecision:
     evidence: dict[str, Any] = field(default_factory=dict)
 
     def to_step_result(self, name: str) -> StepResult:
+        """把动作决策转换成步骤结果，便于工作流统一处理。"""
         return StepResult(
             ok=self.allowed,
             name=name,
@@ -54,16 +56,20 @@ class ActionDecision:
 
 
 class ActionDeniedError(RuntimeError):
+    """动作被策略拒绝时抛出的异常，携带拒绝决策。"""
     def __init__(self, decision: ActionDecision) -> None:
+        """初始化动作拒绝结果错误实例，保存依赖、配置和运行上下文。"""
         super().__init__(decision.message or "Action denied")
         self.decision = decision
 
 
 @dataclass(frozen=True)
 class ActionAuditLogger:
+    """动作审计日志写入器，负责把动作决策写入 JSONL。"""
     path: Path
 
     def log(self, event: dict[str, Any]) -> None:
+        """写入日志事件，记录当前动作或状态。"""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(_to_jsonable(event), ensure_ascii=False) + "\n")
@@ -71,11 +77,13 @@ class ActionAuditLogger:
 
 @dataclass(frozen=True)
 class ActionPolicy:
+    """运行时动作策略，统一判断点击、文件提交和高风险提交是否允许。"""
     run_mode: str
     job_id: str | None = None
     audit_logger: ActionAuditLogger | None = None
 
     def __post_init__(self) -> None:
+        """在 dataclass 初始化后规范化字段，保证后续流程拿到一致的运行值。"""
         if self.run_mode not in RUN_MODES:
             raise ValueError(f"Unsupported run_mode: {self.run_mode}")
 
@@ -87,6 +95,7 @@ class ActionPolicy:
         action_type: str = "data_change",
         permit: Any | None = None,
     ) -> ActionDecision:
+        """在点击前根据标签、风险级别和上下文做动作授权判断。"""
         return self.before_action(
             label=label,
             action_type=action_type,
@@ -102,6 +111,7 @@ class ActionPolicy:
         context: dict[str, Any] | None = None,
         permit: Any | None = None,
     ) -> ActionDecision:
+        """在任意业务动作前做统一授权判断。"""
         context = context or {}
         if _is_high_risk_label(label):
             decision = self._decide_high_risk(label, action_type, context, permit)
@@ -148,6 +158,7 @@ class ActionPolicy:
         context: dict[str, Any] | None = None,
         permit: Any | None = None,
     ) -> ActionDecision:
+        """要求动作必须被允许，否则抛出拒绝异常。"""
         decision = self.before_action(
             label=label,
             action_type=action_type,
@@ -165,10 +176,16 @@ class ActionPolicy:
         context: dict[str, Any],
         permit: Any | None,
     ) -> ActionDecision:
+        """对报送等高风险动作执行专门的提交授权判断。"""
         if permit is not None:
             allowed = _consume_permit(permit, label=label, context=context)
             if allowed:
-                return self._allowed(label, action_type, context, permit_id=getattr(permit, "permit_id", None))
+                return self._allowed(
+                    label,
+                    action_type,
+                    context,
+                    permit_id=getattr(permit, "permit_id", None),
+                )
 
         return ActionDecision(
             allowed=False,
@@ -188,6 +205,7 @@ class ActionPolicy:
         context: dict[str, Any],
         permit_id: str | None = None,
     ) -> ActionDecision:
+        """构造允许动作的策略决策结果。"""
         evidence = self._evidence(label, action_type, context)
         if permit_id is not None:
             evidence["permit_id"] = permit_id
@@ -205,6 +223,7 @@ class ActionPolicy:
         action_type: str,
         context: dict[str, Any],
     ) -> dict[str, Any]:
+        """生成动作决策的审计证据。"""
         return {
             "job_id": self.job_id,
             "run_mode": self.run_mode,
@@ -215,6 +234,7 @@ class ActionPolicy:
         }
 
     def _audit(self, decision: ActionDecision, context: dict[str, Any]) -> None:
+        """把动作策略决策写入审计日志。"""
         if self.audit_logger is None:
             return
         event = {
@@ -233,11 +253,13 @@ class ActionPolicy:
 
 
 def _is_high_risk_label(label: str) -> bool:
+    """判断内部条件是否匹配高风险标签。"""
     normalized = normalize_text(label)
     return normalized in {normalize_text(item) for item in HIGH_RISK_LABELS}
 
 
 def _consume_permit(permit: Any, *, label: str, context: dict[str, Any]) -> bool:
+    """执行运行时、动作策略中的内部辅助逻辑：consume许可。"""
     consume = getattr(permit, "consume", None)
     if callable(consume):
         return bool(
@@ -251,6 +273,7 @@ def _consume_permit(permit: Any, *, label: str, context: dict[str, Any]) -> bool
 
 
 def _to_jsonable(value: Any) -> Any:
+    """把路径、数据类和嵌套对象转换为可 JSON 序列化结构。"""
     if isinstance(value, dict):
         return {str(key): _to_jsonable(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set)):

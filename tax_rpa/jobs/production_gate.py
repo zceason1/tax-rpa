@@ -7,6 +7,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ProductionGateResult:
+    """生产门禁门禁结果结果对象，承载执行状态、证据和后续判断所需字段。"""
     allowed: bool
     status: str
     missing_gates: list[str] = field(default_factory=list)
@@ -16,6 +17,7 @@ class ProductionGateResult:
     evidence: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        """转换为普通字典，便于写入 JSON、日志或回调载荷。"""
         return {
             "allowed": self.allowed,
             "status": self.status,
@@ -29,10 +31,12 @@ class ProductionGateResult:
 
 @dataclass(frozen=True)
 class ProductionGate:
+    """生产门禁检查器，负责判断生产提交前置条件是否满足。"""
     checklist_path: Path = Path("config/submit_enablement_checklist.json")
     tax_client_version_reader: Callable[[], str] | None = None
 
     def evaluate(self) -> ProductionGateResult:
+        """评估生产门禁是否满足，返回允许或拒绝原因。"""
         try:
             checklist = json.loads(self.checklist_path.read_text(encoding="utf-8"))
         except Exception:
@@ -98,6 +102,7 @@ class ProductionGate:
         expected_mode: str,
         expected_version: str,
     ) -> dict[str, Any]:
+        """检查金丝雀验证记录是否满足生产门禁要求。"""
         if not isinstance(raw_path, str) or not raw_path.strip():
             return {"passed": False, "reason": "missing_path"}
         path = Path(raw_path)
@@ -126,6 +131,7 @@ class ProductionGate:
 
 
 def _denied(missing_gates: list[str], message: str) -> ProductionGateResult:
+    """执行作业、生产门禁门禁中的内部辅助逻辑：拒绝结果。"""
     return ProductionGateResult(
         allowed=False,
         status="blocked",
@@ -137,10 +143,12 @@ def _denied(missing_gates: list[str], message: str) -> ProductionGateResult:
 
 
 def _review_approved(value: Any) -> bool:
+    """执行作业、生产门禁门禁中的内部辅助逻辑：reviewapproved。"""
     return isinstance(value, dict) and value.get("status") == "approved"
 
 
 def _read_version(reader: Callable[[], str] | None) -> str:
+    """读取版本，并处理缺失或异常情况。"""
     if reader is None:
         return "unknown"
     try:
@@ -150,5 +158,6 @@ def _read_version(reader: Callable[[], str] | None) -> str:
 
 
 def _text_or_unknown(value: Any) -> str:
+    """执行作业、生产门禁门禁中的内部辅助逻辑：文本or未知值。"""
     text = str(value).strip() if value is not None else ""
     return text or "unknown"

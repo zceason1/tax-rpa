@@ -13,6 +13,7 @@ def cleanup_artifacts(
     policy: RetentionPolicy | None = None,
     now: Callable[[], datetime] | None = None,
 ) -> RetentionReport:
+    """按保留策略清理过期产物目录。"""
     root = Path(artifacts_root)
     combined = RetentionReport()
     cleanup_roots = _cleanup_roots(root)
@@ -25,6 +26,7 @@ def cleanup_artifacts(
 
 
 def _cleanup_roots(root: Path) -> list[Path]:
+    """计算需要参与清理的新版和旧版产物根目录。"""
     jobs_root = root / "jobs"
     if root.name == "jobs":
         return [root]
@@ -32,6 +34,7 @@ def _cleanup_roots(root: Path) -> list[Path]:
 
 
 def parse_args() -> argparse.Namespace:
+    """解析命令行参数，返回入口函数使用的参数对象。"""
     parser = argparse.ArgumentParser(
         description="Delete expired RPA artifact evidence according to retention policy."
     )
@@ -56,6 +59,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """命令行入口，解析参数并触发对应业务流程。"""
     args = parse_args()
     report = cleanup_artifacts(
         args.artifacts_root,

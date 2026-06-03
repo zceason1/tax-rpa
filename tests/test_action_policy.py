@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tax_rpa.jobs.action_policy import (
+from tax_rpa.runtime.action_policy import (
     ActionAuditLogger,
     ActionDeniedError,
     ActionPolicy,

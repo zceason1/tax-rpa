@@ -7,10 +7,13 @@ if TYPE_CHECKING:
 
 
 class OpenSalaryIncomeFormStep:
+    """open工资薪金收入form步骤步骤，封装该页面动作的执行入口。"""
     def __init__(self, page: "ComprehensiveIncomePage") -> None:
+        """初始化open工资薪金收入form步骤实例，保存依赖、配置和运行上下文。"""
         self.page = page
 
     def run(self) -> StepResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         with self.page.step("点击正常工资薪金所得行"):
             row_result = self.page.click_salary_income_row()
 

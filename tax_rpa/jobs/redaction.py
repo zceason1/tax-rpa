@@ -15,6 +15,7 @@ SENSITIVE_KEY_PARTS = (
 
 
 def redact_sensitive(value: Any, key: str | None = None) -> Any:
+    """递归脱敏敏感字段，避免密码和令牌进入日志。"""
     if key is not None and _is_sensitive_key(key):
         return "[REDACTED]"
     if dataclasses.is_dataclass(value):
@@ -32,5 +33,6 @@ def redact_sensitive(value: Any, key: str | None = None) -> Any:
 
 
 def _is_sensitive_key(key: str) -> bool:
+    """判断字段名是否属于敏感信息。"""
     normalized = key.lower()
     return any(part in normalized for part in SENSITIVE_KEY_PARTS)

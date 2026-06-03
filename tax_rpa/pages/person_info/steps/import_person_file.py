@@ -8,10 +8,13 @@ if TYPE_CHECKING:
 
 
 class ImportPersonFileStep:
+    """导入人员文件步骤步骤，封装该页面动作的执行入口。"""
     def __init__(self, page: "PersonInfoPage") -> None:
+        """初始化导入人员文件步骤实例，保存依赖、配置和运行上下文。"""
         self.page = page
 
     def run(self, path: Path) -> StepResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         with self.page.step("关闭提示弹窗"):
             message_result = self.page.close_message_dialog_if_present()
 

@@ -1,11 +1,11 @@
 import unittest
 
-from tax_rpa.components.import_result import classify_import_result
-from tax_rpa.components.left_nav import should_try_home_card_fallback
-from tax_rpa.components.message_dialog import is_blocking_dialog
 from tax_rpa.drivers.mouse_driver import point_near
 from tax_rpa.drivers.ocr_driver import find_best_ocr_match
 from tax_rpa.drivers.win32_driver import find_button_by_labels
+from tax_rpa.pages.person_info.elements.import_result import classify_import_result
+from tax_rpa.pages.shared.components.left_nav import should_try_home_card_fallback
+from tax_rpa.pages.shared.components.message_dialog import is_blocking_dialog
 
 
 IMPORT_TEXT = "\u5bfc\u5165"

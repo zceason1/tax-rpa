@@ -1,15 +1,17 @@
 from typing import Any
 
-from tax_rpa.utils import normalize_text
+from tax_rpa.runtime.text import normalize_text
 
 
 class UiaDriver:
+    """UIA自动化驱动驱动，封装底层系统能力，供页面组件调用。"""
     def invoke_text(
         self,
         hwnd: int,
         text: str,
         artifact_name: str | None = None,
     ) -> dict[str, Any] | None:
+        """执行底层驱动、UIA自动化驱动中的invoke文本逻辑，供业务流程或相邻模块调用。"""
         element = self._find_text_element(hwnd, text)
         if element is None:
             return None
@@ -30,6 +32,7 @@ class UiaDriver:
         text: str,
         artifact_name: str | None = None,
     ) -> dict[str, Any] | None:
+        """执行底层驱动、UIA自动化驱动中的focus文本逻辑，供业务流程或相邻模块调用。"""
         element = self._find_text_element(hwnd, text)
         if element is None:
             return None
@@ -46,6 +49,7 @@ class UiaDriver:
         }
 
     def _find_text_element(self, hwnd: int, text: str) -> Any | None:
+        """执行底层驱动、UIA自动化驱动中的内部辅助逻辑：find文本element。"""
         try:
             from pywinauto import Desktop
 
@@ -62,6 +66,7 @@ class UiaDriver:
         return None
 
     def _try_invoke(self, element: Any) -> str | None:
+        """执行底层驱动、UIA自动化驱动中的内部辅助逻辑：tryinvoke。"""
         for action in ("invoke", "select"):
             method = getattr(element, action, None)
             if not callable(method):
@@ -75,6 +80,7 @@ class UiaDriver:
 
 
 def _element_matches_text(element: Any, target: str) -> bool:
+    """执行底层驱动、UIA自动化驱动中的内部辅助逻辑：elementmatches文本。"""
     target_text = normalize_text(target)
     if not target_text:
         return False
@@ -90,6 +96,7 @@ def _element_matches_text(element: Any, target: str) -> bool:
 
 
 def _element_texts(element: Any) -> list[str]:
+    """执行底层驱动、UIA自动化驱动中的内部辅助逻辑：elementtexts。"""
     values: list[str] = []
     for getter_name in ("window_text",):
         getter = getattr(element, getter_name, None)

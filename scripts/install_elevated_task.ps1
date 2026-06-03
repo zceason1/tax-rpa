@@ -2,6 +2,7 @@ param(
     [string]$TaskName = "TaxRpaElevatedWorkflow",
     [string]$ConfigPath = "config\person_import.json",
     [string]$RunAsUser = "",
+    [string]$GrantRunToUser = "",
     [switch]$Submit,
     [switch]$Reset
 )
@@ -26,6 +27,7 @@ param(
     [string]$ProjectRoot,
     [string]$ConfigPath,
     [string]$RunAsUser,
+    [string]$GrantRunToUser,
     [string]$LogPath,
     [switch]$Submit,
     [switch]$Reset
@@ -41,6 +43,10 @@ $registerArgs = @{
 
 if (-not [string]::IsNullOrWhiteSpace($RunAsUser)) {
     $registerArgs.RunAsUser = $RunAsUser
+}
+
+if (-not [string]::IsNullOrWhiteSpace($GrantRunToUser)) {
+    $registerArgs.GrantRunToUser = $GrantRunToUser
 }
 
 if ($Submit) {
@@ -78,6 +84,10 @@ $bootstrapArgs = @(
 
 if (-not [string]::IsNullOrWhiteSpace($RunAsUser)) {
     $bootstrapArgs += @("-RunAsUser", $RunAsUser)
+}
+
+if (-not [string]::IsNullOrWhiteSpace($GrantRunToUser)) {
+    $bootstrapArgs += @("-GrantRunToUser", $GrantRunToUser)
 }
 
 if ($Submit) {

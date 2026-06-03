@@ -36,6 +36,7 @@ DEFAULT_FAILURE_ERROR_CODES = {
 
 
 def classify_step_result(matrix_step: str, result: StepResult) -> dict[str, Any]:
+    """把步骤结果归一化为结果矩阵记录。"""
     outcome = _outcome(result)
     error_type = result.error_type
     error_code = result.error_code
@@ -70,6 +71,7 @@ def classify_step_result(matrix_step: str, result: StepResult) -> dict[str, Any]
 
 
 def _outcome(result: StepResult) -> str:
+    """根据步骤状态和业务标记计算统一结果分类。"""
     if result.ok:
         return "success"
     if result.error_type == "BLOCKED_BY_UNEXPECTED_DIALOG" or result.status == "blocked":

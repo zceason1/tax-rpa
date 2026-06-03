@@ -2,13 +2,14 @@ from typing import Any
 
 from tax_rpa.drivers.ocr_driver import OcrDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
-from tax_rpa.jobs.action_policy import ActionPolicy
+from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.pages.person_info.elements.import_menu import IMPORT_FILE_OPTIONS
 from tax_rpa.runtime.result import StepResult
-from tax_rpa.utils import normalize_text
+from tax_rpa.runtime.text import normalize_text
 
 
 class ImportDropdownComponent:
+    """导入下拉组件，负责从导入菜单中选择指定导入项。"""
     def __init__(
         self,
         hwnd: int,
@@ -19,6 +20,7 @@ class ImportDropdownComponent:
         win32: Win32Driver | None = None,
         action_policy: ActionPolicy | None = None,
     ) -> None:
+        """初始化导入dropdowncomponent实例，保存依赖、配置和运行上下文。"""
         self.hwnd = hwnd
         self.logger = logger
         self.config = config
@@ -28,6 +30,7 @@ class ImportDropdownComponent:
         self.action_policy = action_policy or ActionPolicy(run_mode="execute_no_send")
 
     def choose_item(self, text: str) -> StepResult:
+        """在已展开的导入菜单中选择指定文本项。"""
         dialog = self.win32.find_file_dialog(
             min(3, self.config.import_timeout_seconds),
             self.allowed_pids,

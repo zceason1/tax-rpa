@@ -1,11 +1,12 @@
 from typing import Any
 
 from tax_rpa.drivers.ocr_driver import OcrDriver
-from tax_rpa.jobs.action_policy import ActionPolicy
+from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
 
 
 class ToolbarComponent:
+    """共享工具栏组件，负责按文本目标点击页面工具栏按钮。"""
     def __init__(
         self,
         content_rect: list[int],
@@ -15,6 +16,7 @@ class ToolbarComponent:
         ocr: OcrDriver | None = None,
         action_policy: ActionPolicy | None = None,
     ) -> None:
+        """初始化工具栏component实例，保存依赖、配置和运行上下文。"""
         self.content_rect = content_rect
         self.logger = logger
         self.min_score = min_score
@@ -29,6 +31,7 @@ class ToolbarComponent:
         action_type: str = "data_change",
         permit: Any | None = None,
     ) -> StepResult:
+        """按按钮文本定位并点击工具栏按钮，返回点击证据。"""
         decision = self.action_policy.before_click(
             text,
             {"step_name": "toolbar.click_button"},

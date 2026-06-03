@@ -4,16 +4,19 @@ from tax_rpa.runtime.result import StepResult
 
 
 class PrefillDeductionStep:
+    """预填扣除步骤步骤，封装该页面动作的执行入口。"""
     def __init__(
         self,
         page: Any,
         *,
         allow_skip_personal_pension: bool = False,
     ) -> None:
+        """初始化预填扣除步骤实例，保存依赖、配置和运行上下文。"""
         self.page = page
         self.allow_skip_personal_pension = allow_skip_personal_pension
 
     def run(self) -> StepResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         with self.page.step("click_prefill_deduction"):
             click_result = self.page.click_prefill_deduction()
         if not click_result.ok:
@@ -63,6 +66,7 @@ class PrefillDeductionStep:
         )
 
     def _failed(self, result: StepResult, **evidence: StepResult) -> StepResult:
+        """把失败步骤包装成上层失败结果，并保留已执行步骤证据。"""
         return StepResult(
             ok=False,
             name="comprehensive_income.prefill_deduction",

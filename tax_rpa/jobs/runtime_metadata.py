@@ -10,6 +10,7 @@ ValueReader = Callable[[], Any]
 
 @dataclass(frozen=True)
 class RuntimeMetadata:
+    """运行时元数据采集器，负责收集脚本版本、提交号和屏幕信息。"""
     script_version: str
     git_commit: str
     tax_client_version: str
@@ -29,6 +30,7 @@ class RuntimeMetadata:
         screen_reader: ValueReader | None = None,
         windows_user_reader: ValueReader | None = None,
     ) -> "RuntimeMetadata":
+        """采集当前模块需要的运行时信息并返回结构化对象。"""
         screen = _safe_dict(screen_reader or _read_screen)
         return cls(
             script_version=_safe_text(script_version_reader or _read_script_version),
@@ -44,10 +46,12 @@ class RuntimeMetadata:
         )
 
     def to_dict(self) -> dict[str, Any]:
+        """转换为普通字典，便于写入 JSON、日志或回调载荷。"""
         return asdict(self)
 
 
 def _safe_text(reader: ValueReader) -> str:
+    """安全读取文本值，异常时返回 unknown。"""
     try:
         value = reader()
     except Exception:
@@ -59,6 +63,7 @@ def _safe_text(reader: ValueReader) -> str:
 
 
 def _safe_dict(reader: ValueReader) -> dict[str, Any]:
+    """安全读取字典值，异常时返回空字典。"""
     try:
         value = reader()
     except Exception:
@@ -67,6 +72,7 @@ def _safe_dict(reader: ValueReader) -> dict[str, Any]:
 
 
 def _safe_int(value: Any) -> int | None:
+    """把值安全转换为整数，失败时返回空值。"""
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
@@ -78,6 +84,7 @@ def _safe_int(value: Any) -> int | None:
 
 
 def _read_script_version() -> str:
+    """读取脚本版本标识。"""
     try:
         import tax_rpa
 
@@ -87,6 +94,7 @@ def _read_script_version() -> str:
 
 
 def _read_git_commit() -> str:
+    """读取当前代码提交标识，无法读取时返回 unknown。"""
     try:
         completed = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -100,8 +108,10 @@ def _read_git_commit() -> str:
 
 
 def _read_screen() -> dict[str, int | None]:
+    """读取当前屏幕尺寸信息。"""
     return {"width": None, "height": None, "dpi": None}
 
 
 def _unknown() -> str:
+    """返回统一的 unknown 占位值。"""
     return "unknown"

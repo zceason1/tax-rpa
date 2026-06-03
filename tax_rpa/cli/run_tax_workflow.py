@@ -23,12 +23,15 @@ shell32 = ctypes.windll.shell32
 
 
 class WorkflowExecutionError(RuntimeError):
+    """工作流执行错误异常，表示cli、run税务工作流中的特定错误场景。"""
     def __init__(self, result: Any) -> None:
+        """初始化工作流执行错误实例，保存依赖、配置和运行上下文。"""
         super().__init__(result.error or result.status)
         self.result = result
 
 
 def failure_payload(exc: Exception) -> dict[str, Any]:
+    """执行cli、run税务工作流中的failure载荷逻辑，供业务流程或相邻模块调用。"""
     payload: dict[str, Any] = {
         "error": str(exc),
         "traceback": traceback.format_exc(),
@@ -47,6 +50,7 @@ def failure_payload(exc: Exception) -> dict[str, Any]:
 
 
 def is_user_admin() -> bool:
+    """判断当前进程是否具备管理员权限。"""
     try:
         return bool(shell32.IsUserAnAdmin())
     except Exception:
@@ -54,6 +58,7 @@ def is_user_admin() -> bool:
 
 
 def relaunch_as_admin(argv: list[str]) -> None:
+    """以管理员权限重新启动当前命令。"""
     params = subprocess.list2cmdline(["-m", MODULE_NAME, *argv])
     result = shell32.ShellExecuteW(
         None,
@@ -68,6 +73,7 @@ def relaunch_as_admin(argv: list[str]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    """解析命令行参数，返回入口函数使用的参数对象。"""
     parser = argparse.ArgumentParser(
         description="Run the composed tax RPA workflow from app lifecycle through business steps."
     )
@@ -105,6 +111,7 @@ def run_workflow(
     reset: bool = False,
     self_check: bool = False,
 ) -> dict[str, Any]:
+    """执行cli、run税务工作流中的run工作流逻辑，供业务流程或相邻模块调用。"""
     app_factory = (
         (lambda config, logger: SelfCheckApp(config, logger))
         if self_check
@@ -128,6 +135,7 @@ def run_workflow(
 
 
 def main() -> None:
+    """命令行入口，解析参数并触发对应业务流程。"""
     args = parse_args()
     if not args.no_self_elevate and not is_user_admin():
         relaunch_as_admin(sys.argv[1:])

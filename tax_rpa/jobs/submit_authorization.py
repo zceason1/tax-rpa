@@ -5,13 +5,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from tax_rpa.jobs.action_policy import ActionAuditLogger
 from tax_rpa.jobs.manifest import JobManifest
-from tax_rpa.utils import normalize_text
+from tax_rpa.runtime.action_policy import ActionAuditLogger
+from tax_rpa.runtime.text import normalize_text
 
 
 @dataclass
 class SubmitPermit:
+    """提交许可，封装作业、提交授权相关状态和行为。"""
     job_id: str
     step_name: str
     label: str
@@ -20,6 +21,7 @@ class SubmitPermit:
     consumed: bool = False
 
     def consume(self, *, label: str, job_id: str | None, step_name: str | None) -> bool:
+        """消费一次性提交许可，防止同一许可被重复用于高风险动作。"""
         if self.consumed:
             return False
         if job_id != self.job_id:
@@ -36,6 +38,7 @@ class SubmitPermit:
 
 @dataclass(frozen=True)
 class SubmitAuthorizationResult:
+    """提交授权结果结果对象，承载执行状态、证据和后续判断所需字段。"""
     allowed: bool
     error_type: str | None = None
     error_code: str | None = None
@@ -47,6 +50,7 @@ class SubmitAuthorizationResult:
 
 @dataclass(frozen=True)
 class SubmitAuthorization:
+    """提交授权服务，负责合并运行模式、门禁和一次性许可。"""
     production_switch_path: Path = Path("config/production_submit_enabled.json")
     cli_submit: bool = False
     windows_user: str | None = None
@@ -61,6 +65,7 @@ class SubmitAuthorization:
         step_name: str,
         label: str,
     ) -> SubmitAuthorizationResult:
+        """综合运行模式、生产门禁和一次性许可，判断是否允许真实提交。"""
         switch = self._read_production_switch()
         missing_gates: list[str] = []
 
@@ -119,6 +124,7 @@ class SubmitAuthorization:
         return result
 
     def _read_production_switch(self) -> dict[str, Any]:
+        """读取生产提交开关配置。"""
         try:
             data = json.loads(self.production_switch_path.read_text(encoding="utf-8"))
         except Exception:
@@ -148,6 +154,7 @@ class SubmitAuthorization:
         step_name: str,
         label: str,
     ) -> None:
+        """把动作策略决策写入审计日志。"""
         if self.audit_logger is None:
             return
         self.audit_logger.log(
@@ -170,6 +177,7 @@ class SubmitAuthorization:
 
 
 def _gate_to_dict(result: Any | None) -> dict[str, Any] | None:
+    """执行作业、提交授权中的内部辅助逻辑：门禁todict。"""
     if result is None:
         return None
     to_dict = getattr(result, "to_dict", None)

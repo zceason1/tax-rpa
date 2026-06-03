@@ -32,6 +32,7 @@ REQUIRED_ELEMENT_FIELDS = {
 
 @dataclass(frozen=True)
 class CalibrationGateResult:
+    """校准门禁结果结果对象，承载执行状态、证据和后续判断所需字段。"""
     allowed: bool
     status: str
     missing_steps: list[str] = field(default_factory=list)
@@ -42,6 +43,7 @@ class CalibrationGateResult:
     message: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """转换为普通字典，便于写入 JSON、日志或回调载荷。"""
         return {
             "allowed": self.allowed,
             "status": self.status,
@@ -56,6 +58,7 @@ class CalibrationGateResult:
 
 @dataclass(frozen=True)
 class CalibrationGate:
+    """校准门禁，封装作业、校准相关状态和行为。"""
     calibration_root: Path = Path("artifacts/calibration")
 
     def evaluate(
@@ -65,6 +68,7 @@ class CalibrationGate:
         tax_client_version: str,
         real_client: bool,
     ) -> CalibrationGateResult:
+        """评估生产门禁是否满足，返回允许或拒绝原因。"""
         if not real_client:
             return CalibrationGateResult(
                 allowed=True,
@@ -114,6 +118,7 @@ class CalibrationGate:
         tax_client_version: str,
         step_name: str,
     ) -> tuple[list[dict[str, Any]], str | None]:
+        """读取元素定义，并处理缺失或异常情况。"""
         path = (
             self.calibration_root
             / tax_client_version
@@ -140,6 +145,7 @@ def _validate_element(
     tax_client_version: str,
     step_name: str,
 ) -> str | None:
+    """执行作业、校准中的内部辅助逻辑：validateelement。"""
     if not isinstance(item, dict):
         return "element_not_object"
     missing = sorted(REQUIRED_ELEMENT_FIELDS - set(item))
@@ -157,6 +163,7 @@ def _validate_element(
 
 
 def _has_submit_result_texts(elements: list[dict[str, Any]]) -> bool:
+    """执行作业、校准中的内部辅助逻辑：has提交结果texts。"""
     for element in elements:
         if element.get("element_id") != "declaration_submission.result_text":
             continue

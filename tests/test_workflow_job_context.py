@@ -3,13 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tax_rpa.jobs.action_policy import ActionAuditLogger, ActionPolicy
 from tax_rpa.jobs.artifact_store import ArtifactStore
 from tax_rpa.jobs.manifest import JobManifest, ManifestFile
 from tax_rpa.jobs.observability import JobLogContext, JobObservability
+from tax_rpa.jobs.workflow_step_runner import JobStepRunner
 from tax_rpa.runtime.result import StepResult
-from tax_rpa.workflows.job_context import WorkflowJobContext
-from tax_rpa.workflows.result_matrix import classify_step_result
+from tax_rpa.runtime.result_matrix import classify_step_result
 
 
 def make_manifest() -> JobManifest:
@@ -29,7 +28,7 @@ def make_manifest() -> JobManifest:
     )
 
 
-class WorkflowJobContextTests(unittest.TestCase):
+class JobStepRunnerTests(unittest.TestCase):
     def test_classifies_import_success_failure_and_unknown(self):
         success = classify_step_result(
             "personnel_import",
@@ -79,19 +78,13 @@ class WorkflowJobContextTests(unittest.TestCase):
                     correlation_id="corr-0",
                 ),
             )
-            action_policy = ActionPolicy(
-                run_mode=manifest.run_mode,
-                job_id=manifest.job_id,
-                audit_logger=ActionAuditLogger(artifacts.logs_dir / "actions.jsonl"),
-            )
-            job_context = WorkflowJobContext(
+            runner = JobStepRunner(
                 manifest=manifest,
                 artifacts=artifacts,
                 observability=observability,
-                action_policy=action_policy,
             )
 
-            result = job_context.run_step(
+            result = runner.run_step(
                 workflow="import_person_info_workflow",
                 step="person_info.import_person_file",
                 matrix_step="personnel_import",

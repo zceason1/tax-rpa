@@ -4,11 +4,14 @@ from tax_rpa.runtime.result import StepResult
 
 
 class DeclarationSubmissionReadinessStep:
+    """申报报送就绪检查步骤步骤，封装该页面动作的执行入口。"""
     def __init__(self, page: Any, *, run_mode: str) -> None:
+        """初始化申报报送就绪检查步骤实例，保存依赖、配置和运行上下文。"""
         self.page = page
         self.run_mode = run_mode
 
     def run(self) -> StepResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         with self.page.step("open_declaration_submission_page"):
             open_result = self.page.open_declaration_submission_page()
         if not open_result.ok:
@@ -36,6 +39,7 @@ class DeclarationSubmissionReadinessStep:
         )
 
     def _failed(self, result: StepResult, **evidence: StepResult) -> StepResult:
+        """把失败步骤包装成上层失败结果，并保留已执行步骤证据。"""
         return StepResult(
             ok=False,
             name="comprehensive_income.declaration_submission_readiness",

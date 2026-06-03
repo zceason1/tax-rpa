@@ -4,11 +4,14 @@ from tax_rpa.runtime.result import StepResult
 
 
 class ExportDeclarationReportStep:
+    """导出申报报表步骤步骤，封装该页面动作的执行入口。"""
     def __init__(self, page: Any, *, run_mode: str) -> None:
+        """初始化导出申报报表步骤实例，保存依赖、配置和运行上下文。"""
         self.page = page
         self.run_mode = run_mode
 
     def run(self) -> StepResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         with self.page.step("open_export_report_menu"):
             menu_result = self.page.open_export_report_menu()
         if not menu_result.ok:
@@ -75,6 +78,7 @@ class ExportDeclarationReportStep:
         side_effect_started: bool,
         **evidence: StepResult,
     ) -> StepResult:
+        """把失败步骤包装成上层失败结果，并保留已执行步骤证据。"""
         return StepResult(
             ok=False,
             name="comprehensive_income.export_report",

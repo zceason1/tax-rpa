@@ -8,25 +8,31 @@ from tax_rpa.pages.person_info.steps.open_page import OpenPersonInfoPageStep
 from tax_rpa.pages.person_info.steps.submit_import_data import SubmitImportDataStep
 from tax_rpa.pages.person_info.steps.wait_import_result import WaitImportResultStep
 from tax_rpa.runtime.result import StepResult, WorkflowResult
+from tax_rpa.runtime.workflow_options import WorkflowRuntimeOptions
 from tax_rpa.workflows.app_lifecycle_workflow import AppLifecycleWorkflow
 
 
 class ImportPersonInfoWorkflow:
+    """导入人员信息工作流工作流，负责编排该业务链路的页面步骤和失败结果。"""
     def __init__(
         self,
         config: PersonImportConfig,
         logger: Any,
         app_factory: Callable[[PersonImportConfig, Any], Any] | None = None,
-        job_context: Any | None = None,
+        runtime_options: WorkflowRuntimeOptions | None = None,
+        step_runner: Any | None = None,
         reset: bool = False,
     ) -> None:
+        """初始化导入人员信息工作流实例，保存依赖、配置和运行上下文。"""
         self.config = config
         self.logger = logger
         self.app_factory = app_factory or (lambda config, logger: TaxClientApp(config, logger))
-        self.job_context = job_context
+        self.runtime_options = runtime_options or WorkflowRuntimeOptions.from_config(config)
+        self.step_runner = step_runner
         self.reset = reset
 
     def run(self) -> WorkflowResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         lifecycle = AppLifecycleWorkflow(
             self.config,
             self.logger,
@@ -58,6 +64,7 @@ class ImportPersonInfoWorkflow:
         )
 
     def run_on_app(self, app: Any) -> WorkflowResult:
+        """在已经登录的客户端应用上执行当前业务工作流。"""
         steps: list[StepResult] = []
         page = OpenPersonInfoPageStep(app.shell()).run()
         import_file = self._run_step(
@@ -181,9 +188,10 @@ class ImportPersonInfoWorkflow:
         matrix_step: str | None = None,
         side_effect_step: bool = False,
     ) -> StepResult:
-        if self.job_context is None:
+        """通过步骤执行器运行单个业务步骤，统一保留日志和结果。"""
+        if self.step_runner is None:
             return operation()
-        return self.job_context.run_step(
+        return self.step_runner.run_step(
             workflow="import_person_info_workflow",
             step=step,
             operation=operation,

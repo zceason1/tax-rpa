@@ -9,6 +9,7 @@ from tax_rpa.jobs.artifact_store import JobArtifacts
 
 @dataclass(frozen=True)
 class ArtifactManifestWriter:
+    """产物清单写入器，负责列出作业产物、校验和和来源步骤。"""
     artifacts: JobArtifacts
 
     def write(
@@ -18,6 +19,7 @@ class ArtifactManifestWriter:
         final_status: str,
         callback_status: str,
     ) -> str:
+        """写入目标数据或转发输入，具体行为由所在适配器决定。"""
         manifest = {
             "job_id": job_id,
             "created_at": _now(),
@@ -32,6 +34,7 @@ class ArtifactManifestWriter:
 
 
 def _iter_artifact_files(root: Path) -> list[Path]:
+    """执行作业、产物清单中的内部辅助逻辑：iter产物files。"""
     if not root.exists():
         return []
     return [
@@ -44,6 +47,7 @@ def _iter_artifact_files(root: Path) -> list[Path]:
 
 
 def _artifact_entry(artifacts: JobArtifacts, path: Path) -> dict[str, Any]:
+    """执行作业、产物清单中的内部辅助逻辑：产物entry。"""
     relative = path.relative_to(artifacts.root).as_posix()
     return {
         "type": _artifact_type(relative),
@@ -58,6 +62,7 @@ def _artifact_entry(artifacts: JobArtifacts, path: Path) -> dict[str, Any]:
 
 
 def _artifact_type(relative_path: str) -> str:
+    """执行作业、产物清单中的内部辅助逻辑：产物type。"""
     if relative_path.startswith("input/"):
         return "input"
     if relative_path.startswith("exported/"):
@@ -80,6 +85,7 @@ def _artifact_type(relative_path: str) -> str:
 
 
 def _produced_by_step(relative_path: str) -> str:
+    """执行作业、产物清单中的内部辅助逻辑：producedby步骤。"""
     if relative_path.startswith("input/"):
         return "job_intake"
     if relative_path == "summary.json":
@@ -96,6 +102,7 @@ def _produced_by_step(relative_path: str) -> str:
 
 
 def _is_required(relative_path: str) -> bool:
+    """判断内部条件是否匹配required。"""
     return relative_path in {
         "summary.json",
         "state.json",
@@ -104,6 +111,7 @@ def _is_required(relative_path: str) -> bool:
 
 
 def _sha256(path: Path) -> str:
+    """计算文件 SHA256 校验和。"""
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -112,4 +120,5 @@ def _sha256(path: Path) -> str:
 
 
 def _now() -> str:
+    """生成当前 UTC 时间字符串，供状态和日志落盘使用。"""
     return datetime.now().astimezone().isoformat(timespec="seconds")

@@ -4,12 +4,13 @@ from typing import Any
 
 from PIL import Image, ImageGrab
 
-from tax_rpa.config.person_import import assert_safe_action
 from tax_rpa.drivers.mouse_driver import GetSystemMetrics, MouseDriver, SM_CXSCREEN, SM_CYSCREEN
-from tax_rpa.utils import normalize_text, text_matches
+from tax_rpa.runtime.action_guard import assert_safe_action
+from tax_rpa.runtime.text import normalize_text, text_matches
 
 
 def load_ocr_engine():
+    """加载OCR识别engine，并转换为当前模块使用的数据对象。"""
     try:
         from rapidocr_onnxruntime import RapidOCR
 
@@ -26,6 +27,7 @@ def load_ocr_engine():
 
 
 def iter_ocr_rows(raw_result):
+    """执行底层驱动、OCR识别驱动中的iterOCR识别rows逻辑，供业务流程或相邻模块调用。"""
     if isinstance(raw_result, tuple):
         raw_result = raw_result[0]
     if raw_result is None:
@@ -42,6 +44,7 @@ def iter_ocr_rows(raw_result):
 
 
 def box_in_image(box: list[list[float]], image_size: tuple[int, int], tolerance: int = 4) -> bool:
+    """执行底层驱动、OCR识别驱动中的boxinimage逻辑，供业务流程或相邻模块调用。"""
     width, height = image_size
     xs = [point[0] for point in box]
     ys = [point[1] for point in box]
@@ -54,26 +57,31 @@ def box_in_image(box: list[list[float]], image_size: tuple[int, int], tolerance:
 
 
 def box_center(box: list[list[float]]) -> tuple[int, int]:
+    """执行底层驱动、OCR识别驱动中的boxcenter逻辑，供业务流程或相邻模块调用。"""
     xs = [point[0] for point in box]
     ys = [point[1] for point in box]
     return round(sum(xs) / len(xs)), round(sum(ys) / len(ys))
 
 
 def get_mouse_screen_size() -> tuple[int, int]:
+    """执行底层驱动、OCR识别驱动中的get鼠标屏幕size逻辑，供业务流程或相邻模块调用。"""
     return GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)
 
 
 def _scale_axis(value: int | float, scale: float) -> int:
+    """执行底层驱动、OCR识别驱动中的内部辅助逻辑：scaleaxis。"""
     return round(float(value) * scale)
 
 
 def _unscale_axis(value: int | float, scale: float) -> int:
+    """执行底层驱动、OCR识别驱动中的内部辅助逻辑：unscaleaxis。"""
     if scale <= 0:
         return round(float(value))
     return round(float(value) / scale)
 
 
 def _coordinate_transform(full_image_size: tuple[int, int]) -> dict[str, Any]:
+    """执行底层驱动、OCR识别驱动中的内部辅助逻辑：coordinatetransform。"""
     mouse_width, mouse_height = get_mouse_screen_size()
     image_width, image_height = full_image_size
     scale_x = image_width / mouse_width if mouse_width > 0 else 1.0
@@ -86,6 +94,7 @@ def _coordinate_transform(full_image_size: tuple[int, int]) -> dict[str, Any]:
 
 
 def _image_rect_from_mouse_rect(rect: list[int], transform: dict[str, Any]) -> list[int]:
+    """执行底层驱动、OCR识别驱动中的内部辅助逻辑：image矩形区域从零启动鼠标矩形区域。"""
     scale_x, scale_y = transform["scale"]
     return [
         _scale_axis(rect[0], scale_x),
@@ -96,6 +105,7 @@ def _image_rect_from_mouse_rect(rect: list[int], transform: dict[str, Any]) -> l
 
 
 def _mouse_point_from_image_point(point: list[int], transform: dict[str, Any]) -> list[int]:
+    """执行底层驱动、OCR识别驱动中的内部辅助逻辑：鼠标point从零启动imagepoint。"""
     scale_x, scale_y = transform["scale"]
     return [
         _unscale_axis(point[0], scale_x),
@@ -104,6 +114,7 @@ def _mouse_point_from_image_point(point: list[int], transform: dict[str, Any]) -
 
 
 def _capture_ocr_image(rect: list[int], name: str, logger: Any) -> tuple[str, tuple[int, int], dict[str, Any]]:
+    """执行底层驱动、OCR识别驱动中的内部辅助逻辑：captureOCR识别image。"""
     image_path = logger.out_dir / f"{name}.png"
     full_image = ImageGrab.grab()
     transform = _coordinate_transform(full_image.size)
@@ -122,6 +133,7 @@ def _capture_ocr_image(rect: list[int], name: str, logger: Any) -> tuple[str, tu
 
 
 def ocr_match_priority(text: str, target: str) -> tuple[int, float, int]:
+    """执行底层驱动、OCR识别驱动中的OCR识别matchpriority逻辑，供业务流程或相邻模块调用。"""
     candidate = normalize_text(text)
     normalized_target = normalize_text(target)
     if candidate == normalized_target:
@@ -141,6 +153,7 @@ def find_best_ocr_match(
     image_size: tuple[int, int],
     min_score: float,
 ) -> dict[str, Any] | None:
+    """查找bestOCR识别match，找到时返回匹配对象或证据。"""
     matches = []
     for row in rows:
         box = row.get("box")
@@ -164,6 +177,7 @@ def find_best_ocr_match(
 
 
 def _ocr_text_matches(text: str, target: str) -> bool:
+    """执行底层驱动、OCR识别驱动中的内部辅助逻辑：OCR识别文本matches。"""
     candidate = normalize_text(text)
     normalized_target = normalize_text(target)
     if not candidate or not normalized_target:
@@ -180,6 +194,7 @@ def _ocr_text_matches(text: str, target: str) -> bool:
 
 
 def ocr_rect(rect: list[int], name: str, logger: Any) -> tuple[list[dict[str, Any]], tuple[int, int], str]:
+    """执行底层驱动、OCR识别驱动中的OCR识别矩形区域逻辑，供业务流程或相邻模块调用。"""
     image_path, image_size, _transform = _capture_ocr_image(rect, name, logger)
     engine = load_ocr_engine()
     rows = iter_ocr_rows(engine(str(image_path)))
@@ -192,6 +207,7 @@ def ocr_rect_with_coordinates(
     name: str,
     logger: Any,
 ) -> tuple[list[dict[str, Any]], tuple[int, int], str, dict[str, Any]]:
+    """执行底层驱动、OCR识别驱动中的OCR识别矩形区域withcoordinates逻辑，供业务流程或相邻模块调用。"""
     image_path, image_size, transform = _capture_ocr_image(rect, name, logger)
     engine = load_ocr_engine()
     rows = iter_ocr_rows(engine(str(image_path)))
@@ -199,7 +215,9 @@ def ocr_rect_with_coordinates(
     return rows, image_size, image_path, transform
 
 class OcrDriver:
+    """OCR识别驱动驱动，封装底层系统能力，供页面组件调用。"""
     def __init__(self, mouse: MouseDriver | None = None) -> None:
+        """初始化OCR识别驱动实例，保存依赖、配置和运行上下文。"""
         self.mouse = mouse or MouseDriver()
 
     def find_text(
@@ -210,6 +228,7 @@ class OcrDriver:
         min_score: float,
         artifact_name: str,
     ) -> dict[str, Any] | None:
+        """查找文本，找到时返回匹配对象或证据。"""
         rows, image_size, image_path = ocr_rect(rect, artifact_name, logger)
         match = find_best_ocr_match(rows, text, image_size, min_score)
         if match is not None:
@@ -225,6 +244,7 @@ class OcrDriver:
         dry_run: bool,
         artifact_name: str,
     ) -> dict[str, Any]:
+        """在指定内容区域通过 OCR 文本定位并点击目标。"""
         assert_safe_action(text)
         rows, image_size, image_path, transform = ocr_rect_with_coordinates(rect, artifact_name, logger)
         match = find_best_ocr_match(rows, text, image_size, min_score)

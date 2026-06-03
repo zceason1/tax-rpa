@@ -13,23 +13,29 @@ from tax_rpa.pages.comprehensive_income.steps.open_page import (
     OpenComprehensiveIncomePageStep,
 )
 from tax_rpa.runtime.result import StepResult, WorkflowResult
+from tax_rpa.runtime.workflow_options import WorkflowRuntimeOptions
 from tax_rpa.workflows.app_lifecycle_workflow import AppLifecycleWorkflow
 
 
 class ExportReportWorkflow:
+    """导出报表工作流工作流，负责编排该业务链路的页面步骤和失败结果。"""
     def __init__(
         self,
         config: PersonImportConfig,
         logger: Any,
-        job_context: Any | None = None,
+        runtime_options: WorkflowRuntimeOptions | None = None,
+        step_runner: Any | None = None,
         app_factory: Callable[[PersonImportConfig, Any], Any] | None = None,
     ) -> None:
+        """初始化导出报表工作流实例，保存依赖、配置和运行上下文。"""
         self.config = config
         self.logger = logger
-        self.job_context = job_context
+        self.runtime_options = runtime_options or WorkflowRuntimeOptions.from_config(config)
+        self.step_runner = step_runner
         self.app_factory = app_factory or (lambda config, logger: TaxClientApp(config, logger))
 
     def run(self) -> WorkflowResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         lifecycle = AppLifecycleWorkflow(
             self.config,
             self.logger,
@@ -60,6 +66,7 @@ class ExportReportWorkflow:
         )
 
     def run_on_app(self, app: Any) -> WorkflowResult:
+        """在已经登录的客户端应用上执行当前业务工作流。"""
         page = OpenComprehensiveIncomePageStep(app.shell()).run()
         readiness = self._run_step(
             "comprehensive_income.declaration_submission_readiness_for_export",
@@ -102,10 +109,8 @@ class ExportReportWorkflow:
         )
 
     def _run_mode(self) -> str:
-        manifest = getattr(self.job_context, "manifest", None)
-        if manifest is not None:
-            return manifest.run_mode
-        return "inspect_only" if self.config.dry_run else "execute_no_send"
+        """执行工作流、导出报表工作流中的内部辅助逻辑：run模式。"""
+        return self.runtime_options.run_mode
 
     def _run_step(
         self,
@@ -115,9 +120,10 @@ class ExportReportWorkflow:
         matrix_step: str | None = None,
         side_effect_step: bool = False,
     ) -> StepResult:
-        if self.job_context is None:
+        """通过步骤执行器运行单个业务步骤，统一保留日志和结果。"""
+        if self.step_runner is None:
             return operation()
-        return self.job_context.run_step(
+        return self.step_runner.run_step(
             workflow="export_report_workflow",
             step=step,
             operation=operation,
@@ -126,6 +132,7 @@ class ExportReportWorkflow:
         )
 
     def _failed(self, result: StepResult, steps: list[StepResult]) -> WorkflowResult:
+        """把失败步骤包装成上层失败结果，并保留已执行步骤证据。"""
         return WorkflowResult(
             ok=False,
             name="export_report_workflow",

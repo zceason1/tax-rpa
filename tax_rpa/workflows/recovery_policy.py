@@ -19,6 +19,7 @@ RECOVERABLE_ERROR_MARKERS = (
 
 
 def is_recoverable_environment_failure(result: WorkflowResult) -> bool:
+    """判断是否满足recoverableenvironmentfailure条件。"""
     if result.ok:
         return False
     if result.status in RECOVERABLE_STATUSES:
@@ -28,6 +29,7 @@ def is_recoverable_environment_failure(result: WorkflowResult) -> bool:
 
 
 def has_business_side_effect(result: WorkflowResult) -> bool:
+    """判断当前结果是否包含业务sideeffect。"""
     if result.side_effect_started or result.side_effect_committed:
         return True
     return any(
@@ -37,6 +39,7 @@ def has_business_side_effect(result: WorkflowResult) -> bool:
 
 
 def can_retry_after_failure(result: WorkflowResult) -> bool:
+    """判断当前状态是否允许retryafterfailure。"""
     if not is_recoverable_environment_failure(result):
         return False
     if has_business_side_effect(result):

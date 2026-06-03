@@ -6,15 +6,16 @@ from types import SimpleNamespace
 
 from tax_rpa.cli.from_zero_import_person_info import SelfCheckApp
 from tax_rpa.config.person_import import ImportFileConfig, PersonImportConfig
-from tax_rpa.jobs.action_policy import ActionAuditLogger, ActionPolicy
+from tax_rpa.runtime.action_policy import ActionAuditLogger, ActionPolicy
 from tax_rpa.jobs.artifact_store import ArtifactStore
 from tax_rpa.jobs.manifest import JobManifest, ManifestFile
 from tax_rpa.jobs.observability import JobLogContext, JobObservability
+from tax_rpa.jobs.workflow_step_runner import JobStepRunner
 from tax_rpa.runtime.result import StepResult
+from tax_rpa.runtime.workflow_options import WorkflowRuntimeOptions
 from tax_rpa.workflows.combined_tax_workflow import CombinedTaxWorkflow
 from tax_rpa.workflows.import_person_info_workflow import ImportPersonInfoWorkflow
 from tax_rpa.workflows.import_salary_income_workflow import ImportSalaryIncomeWorkflow
-from tax_rpa.workflows.job_context import WorkflowJobContext
 from tax_rpa.workflows.update_special_deduction_workflow import (
     UpdateSpecialDeductionWorkflow,
 )
@@ -33,14 +34,16 @@ class Phase4WorkflowMigrationTests(unittest.TestCase):
                 dry_run=False,
                 imports={"salary_income": ImportFileConfig(file=salary_file)},
             )
-            artifacts, job_context = self._job_context(root)
+            artifacts, step_runner, action_policy, runtime_options = self._job_runtime(root)
 
             result = CombinedTaxWorkflow(
                 config=config,
                 logger=None,
                 workflow_factories=self._workflow_factories(),
                 app_factory=lambda config, logger: SelfCheckApp(config, logger),
-                job_context=job_context,
+                step_runner=step_runner,
+                action_policy=action_policy,
+                runtime_options=runtime_options,
             ).run()
 
             journal = [
@@ -92,14 +95,16 @@ class Phase4WorkflowMigrationTests(unittest.TestCase):
                 dry_run=False,
                 imports={"salary_income": ImportFileConfig(file=salary_file)},
             )
-            artifacts, job_context = self._job_context(root)
+            artifacts, step_runner, action_policy, runtime_options = self._job_runtime(root)
 
             result = CombinedTaxWorkflow(
                 config=config,
                 logger=None,
                 workflow_factories=self._workflow_factories(),
                 app_factory=lambda config, logger: UnknownPersonImportApp(config, logger),
-                job_context=job_context,
+                step_runner=step_runner,
+                action_policy=action_policy,
+                runtime_options=runtime_options,
             ).run()
 
             step_events = [
@@ -116,7 +121,7 @@ class Phase4WorkflowMigrationTests(unittest.TestCase):
         self.assertEqual(step_events[-1]["result_matrix"]["matrix_step"], "personnel_import")
         self.assertEqual(step_events[-1]["result_matrix"]["outcome"], "unknown")
 
-    def _job_context(self, root: Path):
+    def _job_runtime(self, root: Path):
         artifacts = ArtifactStore(root / "artifacts").for_job("202605-001")
         artifacts.initialize()
         manifest = JobManifest(
@@ -145,33 +150,40 @@ class Phase4WorkflowMigrationTests(unittest.TestCase):
                 correlation_id="corr-0",
             ),
         )
-        return artifacts, WorkflowJobContext(
+        action_policy = ActionPolicy(
+            run_mode=manifest.run_mode,
+            job_id=manifest.job_id,
+            audit_logger=ActionAuditLogger(artifacts.logs_dir / "actions.jsonl"),
+        )
+        runtime_options = WorkflowRuntimeOptions(
+            run_mode=manifest.run_mode,
+            allow_skip_personal_pension=manifest.allow_skip_personal_pension,
+        )
+        return artifacts, JobStepRunner(
             manifest=manifest,
             artifacts=artifacts,
             observability=observability,
-            action_policy=ActionPolicy(
-                run_mode=manifest.run_mode,
-                job_id=manifest.job_id,
-                audit_logger=ActionAuditLogger(artifacts.logs_dir / "actions.jsonl"),
-            ),
-        )
+        ), action_policy, runtime_options
 
     def _workflow_factories(self):
         return [
-            lambda config, logger, job_context=None: ImportPersonInfoWorkflow(
+            lambda config, logger, step_runner=None, runtime_options=None: ImportPersonInfoWorkflow(
                 config,
                 logger,
-                job_context=job_context,
+                step_runner=step_runner,
+                runtime_options=runtime_options,
             ),
-            lambda config, logger, job_context=None: UpdateSpecialDeductionWorkflow(
+            lambda config, logger, step_runner=None, runtime_options=None: UpdateSpecialDeductionWorkflow(
                 config,
                 logger,
-                job_context=job_context,
+                step_runner=step_runner,
+                runtime_options=runtime_options,
             ),
-            lambda config, logger, job_context=None: ImportSalaryIncomeWorkflow(
+            lambda config, logger, step_runner=None, runtime_options=None: ImportSalaryIncomeWorkflow(
                 config,
                 logger,
-                job_context=job_context,
+                step_runner=step_runner,
+                runtime_options=runtime_options,
             ),
         ]
 

@@ -8,6 +8,7 @@ from tax_rpa.runtime.result import StepResult
 
 
 class ImportResultComponent:
+    """人员信息导入结果组件，负责读取并分类导入反馈。"""
     def __init__(
         self,
         hwnd: int,
@@ -16,6 +17,7 @@ class ImportResultComponent:
         allowed_pids: set[int],
         win32: Win32Driver | None = None,
     ) -> None:
+        """初始化导入结果component实例，保存依赖、配置和运行上下文。"""
         self.hwnd = hwnd
         self.logger = logger
         self.config = config
@@ -23,6 +25,7 @@ class ImportResultComponent:
         self.win32 = win32 or Win32Driver()
 
     def read_result(self) -> StepResult:
+        """读取当前业务结果并转换成标准步骤结果。"""
         if self.config.dry_run:
             return StepResult(ok=True, name="wait_import_result", status="dry_run")
         result = self.wait_for_import_result()
@@ -54,6 +57,7 @@ class ImportResultComponent:
         )
 
     def collect_result_dialogs(self) -> list[dict[str, Any]]:
+        """收集当前可能代表导入结果的弹窗文本。"""
         dialogs = []
         for window in self.win32.collect_top_windows():
             if window["pid"] not in self.allowed_pids:
@@ -67,6 +71,7 @@ class ImportResultComponent:
         return dialogs
 
     def wait_for_import_result(self) -> dict[str, Any]:
+        """等待导入结果出现，并返回分类所需证据。"""
         deadline = time.time() + self.config.result_timeout_seconds
         last_dialogs: list[dict[str, Any]] = []
 

@@ -3,6 +3,7 @@ param(
     [string]$ProjectRoot = "",
     [string]$ConfigPath = "config\person_import.json",
     [string]$RunAsUser = "",
+    [string]$GrantRunToUser = "",
     [switch]$Submit,
     [switch]$Reset
 )
@@ -78,6 +79,19 @@ Register-ScheduledTask `
     -TaskName $TaskName `
     -InputObject $task `
     -Force | Out-Null
+
+if (-not [string]::IsNullOrWhiteSpace($GrantRunToUser)) {
+    $taskFileName = $TaskName.TrimStart("\")
+    $taskFile = Join-Path "$env:SystemRoot\System32\Tasks" $taskFileName
+    if (-not (Test-Path -LiteralPath $taskFile)) {
+        throw "Registered task file was not found for ACL update: $taskFile"
+    }
+    & icacls.exe $taskFile "/grant" "$($GrantRunToUser):(RX)" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to grant run access on scheduled task file to: $GrantRunToUser"
+    }
+    Write-Host "Granted scheduled task read/execute access to: $GrantRunToUser"
+}
 
 Write-Host "Registered scheduled task: $TaskName"
 Write-Host "Run as user: $RunAsUser"

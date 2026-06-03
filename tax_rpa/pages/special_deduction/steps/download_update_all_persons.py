@@ -7,10 +7,13 @@ if TYPE_CHECKING:
 
 
 class DownloadUpdateAllPersonsStep:
+    """下载更新全部人员步骤步骤，封装该页面动作的执行入口。"""
     def __init__(self, page: "SpecialDeductionPage") -> None:
+        """初始化下载更新全部人员步骤实例，保存依赖、配置和运行上下文。"""
         self.page = page
 
     def run(self) -> StepResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         with self.page.step("鐐瑰嚮涓嬭浇鏇存柊"):
             download_result = self.page.click_download_update()
 

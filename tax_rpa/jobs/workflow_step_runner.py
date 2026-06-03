@@ -1,21 +1,19 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
 
-from tax_rpa.jobs.action_policy import ActionPolicy
 from tax_rpa.jobs.artifact_store import JobArtifacts
 from tax_rpa.jobs.manifest import JobManifest
 from tax_rpa.jobs.observability import JobLogContext, JobObservability
+from tax_rpa.runtime.result_matrix import classify_step_result
 from tax_rpa.runtime.result import StepResult
-from tax_rpa.workflows.result_matrix import classify_step_result
 
 
 @dataclass
-class WorkflowJobContext:
+class JobStepRunner:
+    """作业步骤执行器，负责在作业上下文中执行步骤并记录观测数据。"""
     manifest: JobManifest
     artifacts: JobArtifacts
     observability: JobObservability
-    action_policy: ActionPolicy
     attempt: int = 1
     _sequence: int = field(default=0, init=False)
 
@@ -28,6 +26,7 @@ class WorkflowJobContext:
         matrix_step: str | None = None,
         side_effect_step: bool = False,
     ) -> StepResult:
+        """执行作业、工作流步骤执行器中的run步骤逻辑，供业务流程或相邻模块调用。"""
         step_observability = self._step_observability(workflow, step)
         step_observability.write_step_journal("step_start", "started")
         step_observability.log_step("step_start", "started")
@@ -82,6 +81,7 @@ class WorkflowJobContext:
         return result
 
     def _step_observability(self, workflow: str, step: str) -> JobObservability:
+        """执行作业、工作流步骤执行器中的内部辅助逻辑：步骤可观测性。"""
         self._sequence += 1
         return self.observability.with_context(
             JobLogContext(

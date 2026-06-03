@@ -1,12 +1,13 @@
 from typing import Any
 
 from tax_rpa.drivers.ocr_driver import OcrDriver
-from tax_rpa.jobs.action_policy import ActionPolicy
+from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
-from tax_rpa.utils import normalize_text
+from tax_rpa.runtime.text import normalize_text
 
 
 class ContentTextComponent:
+    """共享内容区文本组件，负责在页面正文区域识别并点击文本目标。"""
     def __init__(
         self,
         content_rect: list[int],
@@ -16,6 +17,7 @@ class ContentTextComponent:
         ocr: OcrDriver | None = None,
         action_policy: ActionPolicy | None = None,
     ) -> None:
+        """初始化内容文本component实例，保存依赖、配置和运行上下文。"""
         self.content_rect = content_rect
         self.logger = logger
         self.min_score = min_score
@@ -30,6 +32,7 @@ class ContentTextComponent:
         action_type: str = "data_change",
         permit: Any | None = None,
     ) -> StepResult:
+        """在指定内容区域通过 OCR 文本定位并点击目标。"""
         decision = self.action_policy.before_click(
             text,
             {"step_name": "content_text.click_text"},

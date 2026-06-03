@@ -75,6 +75,44 @@ class ElevatedTaskScriptTests(unittest.TestCase):
         self.assertIn("& $RegisterScript @registerArgs", content)
         self.assertNotIn('"-TaskName", $TaskName', content)
 
+    def test_run_elevated_workflow_disables_python_self_elevation(self):
+        content = (PROJECT_ROOT / "scripts/run_elevated_workflow.ps1").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("--no-self-elevate", content)
+
+    def test_start_script_uses_schtasks_run_for_external_triggers(self):
+        content = (PROJECT_ROOT / "scripts/start_elevated_task.ps1").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("schtasks.exe", content)
+        self.assertIn('"/Run"', content)
+        self.assertIn('"/TN"', content)
+        self.assertNotIn("Start-ScheduledTask", content)
+
+    def test_start_cmd_invokes_start_script_for_callers_without_powershell_details(self):
+        cmd_path = PROJECT_ROOT / "scripts/start_elevated_task.cmd"
+        self.assertTrue(cmd_path.exists())
+
+        content = cmd_path.read_text(encoding="utf-8")
+        self.assertIn("start_elevated_task.ps1", content)
+        self.assertIn("powershell.exe", content)
+
+    def test_registration_scripts_can_grant_run_access_to_trigger_user(self):
+        register_content = (
+            PROJECT_ROOT / "scripts/register_elevated_task.ps1"
+        ).read_text(encoding="utf-8")
+        install_content = (
+            PROJECT_ROOT / "scripts/install_elevated_task.ps1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("GrantRunToUser", register_content)
+        self.assertIn("GrantRunToUser", install_content)
+        self.assertIn("icacls.exe", register_content)
+        self.assertIn("(RX)", register_content)
+
 
 if __name__ == "__main__":
     unittest.main()

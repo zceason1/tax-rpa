@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from tax_rpa.components.login import (
+from tax_rpa.app.login import (
     DECLARATION_PASSWORD_LOGIN_TEXT,
     PASSWORD_PLACEHOLDER_TEXT,
     LoginComponent,

@@ -7,8 +7,8 @@ from typing import Any
 
 import psutil
 
-from tax_rpa.constants import FILE_DIALOG_TITLE_HINTS
-from tax_rpa.utils import normalize_text
+from tax_rpa.runtime.dialog_targets import FILE_DIALOG_TITLE_HINTS
+from tax_rpa.runtime.text import normalize_text
 
 
 user32 = ctypes.windll.user32
@@ -70,6 +70,7 @@ WM_SETTEXT = 0x000C
 
 
 def get_text(hwnd: int) -> str:
+    """执行底层驱动、Win32窗口驱动中的get文本逻辑，供业务流程或相邻模块调用。"""
     length = GetWindowTextLengthW(hwnd)
     buf = ctypes.create_unicode_buffer(length + 1)
     GetWindowTextW(hwnd, buf, length + 1)
@@ -77,41 +78,49 @@ def get_text(hwnd: int) -> str:
 
 
 def get_class(hwnd: int) -> str:
+    """执行底层驱动、Win32窗口驱动中的getclass逻辑，供业务流程或相邻模块调用。"""
     buf = ctypes.create_unicode_buffer(256)
     GetClassNameW(hwnd, buf, 256)
     return buf.value
 
 
 def get_rect(hwnd: int) -> list[int]:
+    """执行底层驱动、Win32窗口驱动中的get矩形区域逻辑，供业务流程或相邻模块调用。"""
     rect = wintypes.RECT()
     GetWindowRect(hwnd, ctypes.byref(rect))
     return [rect.left, rect.top, rect.right, rect.bottom]
 
 
 def rect_size(rect: list[int]) -> list[int]:
+    """执行底层驱动、Win32窗口驱动中的矩形区域size逻辑，供业务流程或相邻模块调用。"""
     return [rect[2] - rect[0], rect[3] - rect[1]]
 
 
 def rect_area(rect: list[int]) -> int:
+    """执行底层驱动、Win32窗口驱动中的矩形区域area逻辑，供业务流程或相邻模块调用。"""
     return max(0, rect[2] - rect[0]) * max(0, rect[3] - rect[1])
 
 
 def rect_center(rect: list[int]) -> list[int]:
+    """执行底层驱动、Win32窗口驱动中的矩形区域center逻辑，供业务流程或相邻模块调用。"""
     return [round((rect[0] + rect[2]) / 2), round((rect[1] + rect[3]) / 2)]
 
 
 def window_pid(hwnd: int) -> int:
+    """执行底层驱动、Win32窗口驱动中的窗口pid逻辑，供业务流程或相邻模块调用。"""
     pid = wintypes.DWORD()
     GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     return pid.value
 
 
 def window_thread_id(hwnd: int) -> int:
+    """执行底层驱动、Win32窗口驱动中的窗口threadid逻辑，供业务流程或相邻模块调用。"""
     pid = wintypes.DWORD()
     return int(GetWindowThreadProcessId(hwnd, ctypes.byref(pid)))
 
 
 def window_info(hwnd: int) -> dict[str, Any]:
+    """执行底层驱动、Win32窗口驱动中的窗口信息逻辑，供业务流程或相邻模块调用。"""
     rect = get_rect(hwnd)
     width, height = rect_size(rect)
     return {
@@ -127,10 +136,12 @@ def window_info(hwnd: int) -> dict[str, Any]:
 
 
 def collect_top_windows() -> list[dict[str, Any]]:
+    """收集top窗口，用于后续分类、诊断或审计。"""
     windows: list[dict[str, Any]] = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
     def enum_top(hwnd: int, _lparam: int) -> bool:
+        """执行底层驱动、Win32窗口驱动中的enumtop逻辑，供业务流程或相邻模块调用。"""
         if IsWindowVisible(hwnd):
             info = window_info(hwnd)
             if info["area"] > 0:
@@ -143,6 +154,7 @@ def collect_top_windows() -> list[dict[str, Any]]:
 
 
 def collect_top_windows_for_pids(pids: list[int]) -> list[dict[str, Any]]:
+    """收集top窗口forpids，用于后续分类、诊断或审计。"""
     pid_set = set(pids)
     windows = [window for window in collect_top_windows() if window["pid"] in pid_set]
     windows.sort(key=lambda item: (not item["visible"], -item["area"]))
@@ -150,10 +162,12 @@ def collect_top_windows_for_pids(pids: list[int]) -> list[dict[str, Any]]:
 
 
 def collect_children(hwnd: int) -> list[dict[str, Any]]:
+    """收集子控件，用于后续分类、诊断或审计。"""
     children: list[dict[str, Any]] = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
     def enum_child(child: int, _lparam: int) -> bool:
+        """执行底层驱动、Win32窗口驱动中的enumchild逻辑，供业务流程或相邻模块调用。"""
         children.append(window_info(child))
         return True
 
@@ -163,6 +177,7 @@ def collect_children(hwnd: int) -> list[dict[str, Any]]:
 
 
 def find_main_window(pids: list[int], logger: Any = None) -> dict[str, Any]:
+    """查找主入口窗口，找到时返回匹配对象或证据。"""
     windows = collect_top_windows_for_pids(pids)
     if logger:
         logger.write_json("top_windows_before_find_main.json", windows)
@@ -186,6 +201,7 @@ def find_main_window(pids: list[int], logger: Any = None) -> dict[str, Any]:
 
 
 def set_foreground(hwnd: int) -> None:
+    """执行底层驱动、Win32窗口驱动中的set前台窗口逻辑，供业务流程或相邻模块调用。"""
     foreground = GetForegroundWindow()
     current_thread = int(GetCurrentThreadId())
     foreground_thread = window_thread_id(foreground) if foreground else 0
@@ -231,12 +247,14 @@ def set_foreground(hwnd: int) -> None:
 
 
 def collect_window_texts(hwnd: int) -> list[str]:
+    """收集窗口texts，用于后续分类、诊断或审计。"""
     texts = [get_text(hwnd)]
     texts.extend(child["title"] for child in collect_children(hwnd) if child["title"])
     return [text for text in texts if text]
 
 
 def find_file_dialog(timeout_seconds: int, allowed_pids: set[int] | None = None) -> dict[str, Any] | None:
+    """查找文件弹窗，找到时返回匹配对象或证据。"""
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
         dialogs = []
@@ -256,6 +274,7 @@ def find_file_dialog(timeout_seconds: int, allowed_pids: set[int] | None = None)
 
 
 def wait_for_dialog_closed(hwnd: int, timeout_seconds: int) -> bool:
+    """等待弹窗closed出现或完成，并返回等待结果。"""
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
         if not bool(IsWindowVisible(hwnd)):
@@ -265,6 +284,7 @@ def wait_for_dialog_closed(hwnd: int, timeout_seconds: int) -> bool:
 
 
 def find_largest_edit_control(dialog_hwnd: int) -> dict[str, Any] | None:
+    """查找largesteditcontrol，找到时返回匹配对象或证据。"""
     edits = [
         child
         for child in collect_children(dialog_hwnd)
@@ -279,6 +299,7 @@ def find_button_by_labels(
     children: list[dict[str, Any]],
     labels: tuple[str, ...],
 ) -> dict[str, Any] | None:
+    """查找按钮bylabels，找到时返回匹配对象或证据。"""
     normalized_labels = [normalize_text(label).lower() for label in labels]
     matches = []
     for child in children:
@@ -295,11 +316,13 @@ def find_button_by_labels(
 
 
 def set_window_text(hwnd: int, text: str) -> None:
+    """执行底层驱动、Win32窗口驱动中的set窗口文本逻辑，供业务流程或相邻模块调用。"""
     path_buffer = ctypes.create_unicode_buffer(str(text))
     SendMessageW(hwnd, WM_SETTEXT, 0, ctypes.addressof(path_buffer))
 
 
 def unique_pids(pids: list[int]) -> list[int]:
+    """执行底层驱动、Win32窗口驱动中的uniquepids逻辑，供业务流程或相邻模块调用。"""
     seen = set()
     result = []
     for pid in pids:
@@ -311,6 +334,7 @@ def unique_pids(pids: list[int]) -> list[int]:
 
 
 def split_pids_by_existence(pids: list[int]) -> tuple[list[int], list[int]]:
+    """执行底层驱动、Win32窗口驱动中的splitpidsbyexistence逻辑，供业务流程或相邻模块调用。"""
     gone = []
     alive = []
     for pid in pids:
@@ -326,6 +350,7 @@ def split_pids_by_existence(pids: list[int]) -> tuple[list[int], list[int]]:
 
 
 def process_handles_for_pids(pids: list[int]) -> list[psutil.Process]:
+    """执行底层驱动、Win32窗口驱动中的进程handlesforpids逻辑，供业务流程或相邻模块调用。"""
     processes = []
     for pid in pids:
         try:
@@ -336,7 +361,9 @@ def process_handles_for_pids(pids: list[int]) -> list[psutil.Process]:
 
 
 class Win32Driver:
+    """Win32窗口驱动驱动，封装底层系统能力，供页面组件调用。"""
     def find_process_ids(self, process_name: str) -> list[int]:
+        """按进程名查找客户端进程 ID 列表。"""
         expected = process_name.lower()
         pids = []
         for proc in psutil.process_iter(["pid", "name"]):
@@ -345,9 +372,11 @@ class Win32Driver:
         return pids
 
     def configure_base_process_name(self, process_name: str) -> None:
+        """设置后续进程检测使用的客户端进程名。"""
         self.process_name = process_name.lower()
 
     def launch_client(self, app_path: Path, logger: Any) -> subprocess.Popen | None:
+        """通过配置的快捷方式或可执行文件启动税务客户端。"""
         logger.log("launch_client", "start", app_path=str(app_path))
         if app_path.suffix.lower() == ".lnk":
             result = ShellExecuteW(
@@ -368,6 +397,7 @@ class Win32Driver:
         return process
 
     def wait_for_process(self, process_name: str, timeout_seconds: int, logger: Any) -> list[int]:
+        """等待目标客户端进程出现，并返回进程 ID。"""
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
             pids = self.find_process_ids(process_name)
@@ -383,6 +413,7 @@ class Win32Driver:
         timeout_seconds: int,
         logger: Any,
     ) -> dict[str, Any]:
+        """执行底层驱动、Win32窗口驱动中的terminateprocesses逻辑，供业务流程或相邻模块调用。"""
         processes = []
         terminated_pids = []
         for pid in pids:
@@ -436,24 +467,31 @@ class Win32Driver:
         return result
 
     def find_main_window(self, pids: list[int], logger: Any) -> dict[str, Any]:
+        """查找主入口窗口，找到时返回匹配对象或证据。"""
         return find_main_window(pids, logger=logger)
 
     def set_foreground(self, hwnd: int) -> None:
+        """执行底层驱动、Win32窗口驱动中的set前台窗口逻辑，供业务流程或相邻模块调用。"""
         set_foreground(hwnd)
 
     def collect_top_windows(self) -> list[dict[str, Any]]:
+        """收集top窗口，用于后续分类、诊断或审计。"""
         return collect_top_windows()
 
     def collect_top_windows_for_pids(self, pids: list[int]) -> list[dict[str, Any]]:
+        """收集top窗口forpids，用于后续分类、诊断或审计。"""
         return collect_top_windows_for_pids(pids)
 
     def collect_children(self, hwnd: int) -> list[dict[str, Any]]:
+        """收集子控件，用于后续分类、诊断或审计。"""
         return collect_children(hwnd)
 
     def get_rect(self, hwnd: int) -> list[int]:
+        """执行底层驱动、Win32窗口驱动中的get矩形区域逻辑，供业务流程或相邻模块调用。"""
         return get_rect(hwnd)
 
     def collect_window_texts(self, hwnd: int) -> list[str]:
+        """收集窗口texts，用于后续分类、诊断或审计。"""
         return collect_window_texts(hwnd)
 
     def find_file_dialog(
@@ -461,12 +499,15 @@ class Win32Driver:
         timeout_seconds: int,
         allowed_pids: set[int] | None = None,
     ) -> dict[str, Any] | None:
+        """查找文件弹窗，找到时返回匹配对象或证据。"""
         return find_file_dialog(timeout_seconds, allowed_pids)
 
     def wait_for_dialog_closed(self, hwnd: int, timeout_seconds: int) -> bool:
+        """等待弹窗closed出现或完成，并返回等待结果。"""
         return wait_for_dialog_closed(hwnd, timeout_seconds)
 
     def find_largest_edit_control(self, dialog_hwnd: int) -> dict[str, Any] | None:
+        """查找largesteditcontrol，找到时返回匹配对象或证据。"""
         return find_largest_edit_control(dialog_hwnd)
 
     def find_button_by_labels(
@@ -474,10 +515,13 @@ class Win32Driver:
         children: list[dict[str, Any]],
         labels: tuple[str, ...],
     ) -> dict[str, Any] | None:
+        """查找按钮bylabels，找到时返回匹配对象或证据。"""
         return find_button_by_labels(children, labels)
 
     def set_window_text(self, hwnd: int, text: str) -> None:
+        """执行底层驱动、Win32窗口驱动中的set窗口文本逻辑，供业务流程或相邻模块调用。"""
         set_window_text(hwnd, text)
 
     def rect_center(self, rect: list[int]) -> list[int]:
+        """执行底层驱动、Win32窗口驱动中的矩形区域center逻辑，供业务流程或相邻模块调用。"""
         return rect_center(rect)

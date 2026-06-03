@@ -38,7 +38,9 @@ SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 class ManifestValidationError(ValueError):
+    """清单validation错误异常，表示作业、清单中的特定错误场景。"""
     def __init__(self, message: str, error_type: str, error_code: str) -> None:
+        """初始化清单validation错误实例，保存依赖、配置和运行上下文。"""
         super().__init__(message)
         self.error_type = error_type
         self.error_code = error_code
@@ -46,12 +48,14 @@ class ManifestValidationError(ValueError):
 
 @dataclass(frozen=True)
 class ManifestFile:
+    """清单文件，封装作业、清单相关状态和行为。"""
     path: Path
     sha256: str
 
 
 @dataclass(frozen=True)
 class JobManifest:
+    """作业清单，封装作业、清单相关状态和行为。"""
     job_id: str
     idempotency_key: str
     company_name: str
@@ -68,6 +72,7 @@ class JobManifest:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "JobManifest":
+        """执行作业、清单中的从零启动dict逻辑，供业务流程或相邻模块调用。"""
         if not isinstance(data, dict):
             raise _invalid("Manifest must be a JSON object", "manifest_not_object")
 
@@ -131,16 +136,19 @@ class JobManifest:
 
 
 def load_job_manifest(path: str | Path) -> JobManifest:
+    """加载作业清单，并转换为当前模块使用的数据对象。"""
     manifest_path = Path(path)
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
     return JobManifest.from_dict(data)
 
 
 def _invalid(message: str, error_code: str) -> ManifestValidationError:
+    """执行作业、清单中的内部辅助逻辑：invalid。"""
     return ManifestValidationError(message, "MATERIAL_INVALID", error_code)
 
 
 def _read_str(data: dict[str, Any], key: str) -> str:
+    """从配置字典读取字符串值，并在缺失时使用默认值。"""
     value = data.get(key)
     if not isinstance(value, str) or not value.strip():
         raise _invalid(f"{key} must be a non-empty string", f"manifest_invalid_{key}")
@@ -148,6 +156,7 @@ def _read_str(data: dict[str, Any], key: str) -> str:
 
 
 def _read_bool(data: dict[str, Any], key: str) -> bool:
+    """读取bool，并处理缺失或异常情况。"""
     value = data.get(key)
     if not isinstance(value, bool):
         raise _invalid(f"{key} must be a boolean", f"manifest_invalid_{key}")
@@ -155,12 +164,14 @@ def _read_bool(data: dict[str, Any], key: str) -> bool:
 
 
 def _read_credit_code(value: Any) -> str:
+    """读取creditcode，并处理缺失或异常情况。"""
     if not isinstance(value, str) or len(value.strip()) != 18:
         raise _invalid("credit_code must be an 18-character string", "manifest_invalid_credit_code")
     return value.strip()
 
 
 def _normalize_tax_period(value: str) -> str:
+    """执行作业、清单中的内部辅助逻辑：normalize税务period。"""
     if re.fullmatch(r"\d{6}", value):
         return f"{value[:4]}-{value[4:]}"
     if re.fullmatch(r"\d{4}-\d{2}", value):
@@ -169,6 +180,7 @@ def _normalize_tax_period(value: str) -> str:
 
 
 def _read_files(value: Any) -> dict[str, ManifestFile]:
+    """读取files，并处理缺失或异常情况。"""
     if not isinstance(value, dict):
         raise _invalid("files must be a JSON object", "manifest_invalid_files")
 

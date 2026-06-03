@@ -17,12 +17,14 @@ Transport = Callable[[str, dict[str, Any], dict[str, str], int], "CallbackTransp
 
 @dataclass(frozen=True)
 class CallbackTransportResponse:
+    """回调传输响应，封装作业、回调回调队列相关状态和行为。"""
     status_code: int
     body: str = ""
 
 
 @dataclass(frozen=True)
 class CallbackResult:
+    """回调结果结果对象，承载执行状态、证据和后续判断所需字段。"""
     callback_state: str
     outbox_record_path: str | None = None
     http_status: int | None = None
@@ -30,6 +32,7 @@ class CallbackResult:
 
 
 class CallbackOutbox:
+    """回调发件箱，负责投递回调并保存待重试或死信记录。"""
     def __init__(
         self,
         *,
@@ -41,6 +44,7 @@ class CallbackOutbox:
         dead_letter_after: timedelta = timedelta(hours=24),
         now: Callable[[], datetime] | None = None,
     ) -> None:
+        """初始化回调回调队列实例，保存依赖、配置和运行上下文。"""
         self.artifacts = artifacts
         self.callback_url = callback_url
         self.callback_secret = callback_secret
@@ -50,12 +54,14 @@ class CallbackOutbox:
         self.now = now or (lambda: datetime.now().astimezone())
 
     def deliver(self, payload: dict[str, Any]) -> CallbackResult:
+        """投递业务回调，并记录成功、待重试或死信结果。"""
         if not self.callback_url:
             self._log("callback_skipped", "not_configured", payload=payload)
             return CallbackResult(callback_state="not_configured")
         return self._attempt(payload=payload, attempt_count=1, first_attempt_at=self.now())
 
     def retry_due(self, outbox_record_path: str | Path | None) -> CallbackResult:
+        """执行作业、回调回调队列中的retrydue逻辑，供业务流程或相邻模块调用。"""
         if outbox_record_path is None:
             return CallbackResult(callback_state="not_configured")
         record_path = self.artifacts.root / outbox_record_path
@@ -81,6 +87,7 @@ class CallbackOutbox:
         attempt_count: int,
         first_attempt_at: datetime,
     ) -> CallbackResult:
+        """执行作业、回调回调队列中的内部辅助逻辑：attempt。"""
         now = self.now()
         headers = self._headers(payload)
         http_status: int | None = None
@@ -146,6 +153,7 @@ class CallbackOutbox:
         )
 
     def _headers(self, payload: dict[str, Any]) -> dict[str, str]:
+        """执行作业、回调回调队列中的内部辅助逻辑：headers。"""
         headers = {"Content-Type": "application/json"}
         if self.callback_secret:
             body = _payload_bytes(payload)
@@ -169,6 +177,7 @@ class CallbackOutbox:
         last_http_status: int | None,
         last_error: str | None,
     ) -> str:
+        """写入回调队列记录，用于重试和排障。"""
         record = {
             "callback_state": callback_state,
             "callback_url": self.callback_url,
@@ -183,6 +192,7 @@ class CallbackOutbox:
         return self.artifacts.write_json("callback_outbox.json", redact_sensitive(record))
 
     def _log(self, event: str, status: str, **data: Any) -> None:
+        """执行作业、回调回调队列中的内部辅助逻辑：log。"""
         self.artifacts.logs_dir.mkdir(parents=True, exist_ok=True)
         payload = data.get("payload") or {}
         item = {
@@ -201,6 +211,7 @@ class CallbackOutbox:
 
 
 def _payload_bytes(payload: dict[str, Any]) -> bytes:
+    """执行作业、回调回调队列中的内部辅助逻辑：载荷bytes。"""
     return json.dumps(
         payload,
         ensure_ascii=False,
@@ -210,6 +221,7 @@ def _payload_bytes(payload: dict[str, Any]) -> bytes:
 
 
 def _backoff(attempt_count: int) -> timedelta:
+    """执行作业、回调回调队列中的内部辅助逻辑：backoff。"""
     return timedelta(minutes=2 ** min(attempt_count - 1, 10))
 
 
@@ -219,6 +231,7 @@ def _urllib_transport(
     headers: dict[str, str],
     timeout_seconds: int,
 ) -> CallbackTransportResponse:
+    """执行作业、回调回调队列中的内部辅助逻辑：urllib传输。"""
     body = _payload_bytes(payload)
     req = request.Request(url, data=body, headers=headers, method="POST")
     try:

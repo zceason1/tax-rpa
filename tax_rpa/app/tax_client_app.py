@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from tax_rpa.app.main_shell import MainShell
-from tax_rpa.components.login import LoginComponent
+from tax_rpa.app.login import LoginComponent
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.drivers.win32_driver import Win32Driver
 from tax_rpa.runtime.context import RpaContext
@@ -16,6 +16,7 @@ LOGIN_WINDOW_CLASSES = ("Tfrm_LoginViewer",)
 
 
 def build_launch_decision(pids: list[int], app_path: Path | None) -> dict[str, Any]:
+    """根据进程状态和应用路径判断本次是否需要启动客户端。"""
     if pids:
         return {"action": "reuse_running_process", "pids": pids}
     if app_path is None:
@@ -24,6 +25,7 @@ def build_launch_decision(pids: list[int], app_path: Path | None) -> dict[str, A
 
 
 def choose_login_window(windows: list[dict[str, Any]]) -> dict[str, Any]:
+    """从候选窗口中选择最可能是真实登录界面的窗口。"""
     for class_name in LOGIN_WINDOW_CLASSES:
         for window in windows:
             if window.get("class") == class_name:
@@ -32,18 +34,21 @@ def choose_login_window(windows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 class TaxClientApp:
+    """税务客户端应用门面，负责启动、重置、登录等待和主界面入口。"""
     def __init__(
         self,
         config: PersonImportConfig,
         logger: Any,
         win32: Win32Driver | None = None,
     ) -> None:
+        """初始化税务客户端实例，保存依赖、配置和运行上下文。"""
         self.config = config
         self.logger = logger
         self.win32 = win32 or Win32Driver()
         self.context = RpaContext(config=config, logger=logger)
 
     def reset(self) -> StepResult:
+        """重置税务客户端进程，清理旧窗口后准备重新启动。"""
         self.win32.configure_base_process_name(self.config.process_name)
         pids = self.win32.find_process_ids(self.config.process_name)
         if not pids:
@@ -70,6 +75,7 @@ class TaxClientApp:
         )
 
     def start_if_needed(self) -> StepResult:
+        """在客户端未运行时启动客户端，已运行时直接复用。"""
         self.win32.configure_base_process_name(self.config.process_name)
         pids = self.win32.find_process_ids(self.config.process_name)
         decision = build_launch_decision(pids, self.config.app_path)
@@ -100,6 +106,7 @@ class TaxClientApp:
         )
 
     def wait_for_login(self) -> StepResult:
+        """等待客户端完成登录；配置了自动登录时会尝试自动输入申报密码。"""
         deadline = time.time() + self.config.login_timeout_seconds
         last_error = None
         last_log_at = 0.0
@@ -191,6 +198,7 @@ class TaxClientApp:
         )
 
     def _try_auto_login(self, pids: list[int]) -> StepResult | None:
+        """尝试在登录窗口执行一次自动登录，并返回本次尝试结果。"""
         password = self.config.login.declaration_password
         if not password:
             return None
@@ -217,4 +225,5 @@ class TaxClientApp:
         return result
 
     def shell(self) -> MainShell:
+        """返回主界面门面对象，供工作流继续打开业务页面。"""
         return MainShell(self.context)

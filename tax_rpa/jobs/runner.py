@@ -22,6 +22,7 @@ JobExecutor = Callable[[JobManifest, JobArtifacts], dict[str, Any]]
 
 
 class JobRunner:
+    """作业运行器，负责预检、执行工作流、落盘状态、回调和终态汇总。"""
     def __init__(
         self,
         *,
@@ -35,6 +36,7 @@ class JobRunner:
         runtime_metadata_collector: Callable[[], RuntimeMetadata | dict[str, Any]]
         | None = None,
     ) -> None:
+        """初始化作业执行器实例，保存依赖、配置和运行上下文。"""
         self.artifacts_root = Path(artifacts_root)
         self.lock_path = Path(lock_path)
         self.executor = executor or _fake_executor
@@ -45,6 +47,7 @@ class JobRunner:
         self.runtime_metadata_collector = runtime_metadata_collector
 
     def run(self, manifest_path: str | Path, base_dir: str | Path | None = None) -> dict[str, Any]:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         manifest_path = Path(manifest_path)
         manifest = load_job_manifest(manifest_path)
         job_base_dir = Path(base_dir) if base_dir is not None else manifest_path.parent
@@ -293,6 +296,7 @@ class JobRunner:
         )
 
     def _collect_runtime_metadata(self) -> dict[str, Any]:
+        """执行作业、执行器中的内部辅助逻辑：collect运行时元数据。"""
         if self.runtime_metadata_collector is None:
             metadata: RuntimeMetadata | dict[str, Any] = RuntimeMetadata.collect()
         else:
@@ -319,6 +323,7 @@ class JobRunner:
         runtime_metadata: dict[str, Any] | None = None,
         machine_config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """执行作业、执行器中的内部辅助逻辑：finalizeterminal作业。"""
         error = (
             _error_object(
                 error_type=error_type,
@@ -388,6 +393,7 @@ class JobRunner:
 
 
 def _fake_executor(_manifest: JobManifest, _artifacts: JobArtifacts) -> dict[str, Any]:
+    """执行作业、执行器中的内部辅助逻辑：fake执行器。"""
     return {"workflow_status": "fake_completed"}
 
 
@@ -409,6 +415,7 @@ def _summary(
     runtime_metadata: dict[str, Any] | None = None,
     machine_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """执行作业、执行器中的内部辅助逻辑：摘要。"""
     state_record = _read_json_if_exists(artifacts.root / "state.json") or {}
     return {
         "job_id": manifest.job_id,
@@ -453,6 +460,7 @@ def _summary(
 
 
 def _issue_to_dict(issue: PreflightIssue) -> dict[str, Any]:
+    """执行作业、执行器中的内部辅助逻辑：问题todict。"""
     return {
         "role": issue.role,
         "path": issue.path,
@@ -463,6 +471,7 @@ def _issue_to_dict(issue: PreflightIssue) -> dict[str, Any]:
 
 
 def _executor_result_failed(result: dict[str, Any]) -> bool:
+    """执行作业、执行器中的内部辅助逻辑：执行器结果failed。"""
     return result.get("ok") is False
 
 
@@ -472,6 +481,7 @@ def _business_status(
     executor_result: dict[str, Any] | None,
     error_code: str | None,
 ) -> str:
+    """执行作业、执行器中的内部辅助逻辑：业务状态。"""
     if executor_result:
         return (
             executor_result.get("business_status")
@@ -490,6 +500,7 @@ def _callback_payload(
     business_status: str,
     error: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    """执行作业、执行器中的内部辅助逻辑：回调载荷。"""
     return {
         "job_id": manifest.job_id,
         "idempotency_key": manifest.idempotency_key,
@@ -502,12 +513,14 @@ def _callback_payload(
 
 
 def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
+    """在文件存在时读取 JSON，不存在时返回空结果。"""
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _context(manifest: JobManifest, *, workflow: str, step: str) -> JobLogContext:
+    """执行作业、执行器中的内部辅助逻辑：上下文。"""
     return JobLogContext(
         job_id=manifest.job_id,
         idempotency_key=manifest.idempotency_key,
@@ -527,6 +540,7 @@ def _error_object(
     workflow: str,
     step: str,
 ) -> dict[str, Any]:
+    """执行作业、执行器中的内部辅助逻辑：错误object。"""
     return {
         "type": error_type,
         "code": error_code,

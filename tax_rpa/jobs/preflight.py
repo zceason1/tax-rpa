@@ -13,6 +13,7 @@ TEMP_SUFFIXES = {".tmp", ".part", ".download", ".crdownload"}
 
 @dataclass(frozen=True)
 class PreflightIssue:
+    """预检问题，封装作业、预检相关状态和行为。"""
     role: str
     path: str
     error_type: str
@@ -22,14 +23,17 @@ class PreflightIssue:
 
 @dataclass(frozen=True)
 class PreflightResult:
+    """预检结果结果对象，承载执行状态、证据和后续判断所需字段。"""
     issues: list[PreflightIssue] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
+        """判断当前结果是否满足成功条件。"""
         return not self.issues
 
 
 class PreflightValidator:
+    """作业预检器，负责校验输入文件存在性、完整性和校验和。"""
     def __init__(
         self,
         base_dir: str | Path,
@@ -38,12 +42,14 @@ class PreflightValidator:
         size_reader: Callable[[Path], int] | None = None,
         sha256_reader: Callable[[Path], str] | None = None,
     ) -> None:
+        """初始化预检validator实例，保存依赖、配置和运行上下文。"""
         self.base_dir = Path(base_dir).resolve()
         self.stability_wait_seconds = stability_wait_seconds
         self.size_reader = size_reader or (lambda path: path.stat().st_size)
         self.sha256_reader = sha256_reader or _sha256_file
 
     def validate(self, manifest: JobManifest) -> PreflightResult:
+        """校验输入对象是否满足当前模块的规则。"""
         issues: list[PreflightIssue] = []
         for role, manifest_file in manifest.files.items():
             path = self._resolve_input_path(manifest_file.path)
@@ -53,6 +59,7 @@ class PreflightValidator:
         return PreflightResult(issues=issues)
 
     def _resolve_input_path(self, path: Path) -> Path:
+        """把清单中的输入路径解析到实际文件路径。"""
         if path.is_absolute():
             return path.resolve()
         return (self.base_dir / path).resolve()
@@ -63,6 +70,7 @@ class PreflightValidator:
         path: Path,
         expected_sha256: str,
     ) -> PreflightIssue | None:
+        """校验单个输入文件并生成预检问题。"""
         if not path.is_relative_to(self.base_dir):
             return _issue(
                 role,
@@ -113,6 +121,7 @@ def _issue(
     error_code: str,
     message: str,
 ) -> PreflightIssue:
+    """执行作业、预检中的内部辅助逻辑：问题。"""
     return PreflightIssue(
         role=role,
         path=path.as_posix(),
@@ -123,6 +132,7 @@ def _issue(
 
 
 def _incomplete(role: str, path: Path, message: str) -> PreflightIssue:
+    """执行作业、预检中的内部辅助逻辑：incomplete。"""
     return _issue(
         role,
         path,
@@ -133,6 +143,7 @@ def _incomplete(role: str, path: Path, message: str) -> PreflightIssue:
 
 
 def _sha256_file(path: Path) -> str:
+    """计算输入文件 SHA256 校验和。"""
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):

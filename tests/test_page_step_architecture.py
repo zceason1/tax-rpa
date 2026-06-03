@@ -427,12 +427,6 @@ class PageStepArchitectureTests(unittest.TestCase):
             ],
         )
 
-    def test_legacy_person_info_page_import_reexports_new_page_class(self):
-        legacy = importlib.import_module("tax_rpa.pages.person_info_page")
-        new = importlib.import_module("tax_rpa.pages.person_info.page")
-
-        self.assertIs(legacy.PersonInfoPage, new.PersonInfoPage)
-
     def test_page_steps_do_not_import_driver_or_element_modules_directly(self):
         step_files = [
             Path("tax_rpa/pages/person_info/steps/open_page.py"),
@@ -464,7 +458,6 @@ class PageStepArchitectureTests(unittest.TestCase):
                         violations.append(f"{path}:{module}")
 
         self.assertEqual(violations, [])
-
 
 if __name__ == "__main__":
     unittest.main()

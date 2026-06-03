@@ -3,9 +3,6 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
-from tax_rpa.components.file_dialog import FileDialogComponent
-from tax_rpa.components.left_nav import LeftNavComponent
-from tax_rpa.components.toolbar import ToolbarComponent
 from tax_rpa.drivers.ocr_driver import OcrDriver, find_best_ocr_match, ocr_rect
 from tax_rpa.drivers.region_driver import RegionDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
@@ -17,12 +14,16 @@ from tax_rpa.pages.person_info.elements.import_menu import (
     SUBMIT_DATA_BUTTON,
 )
 from tax_rpa.pages.person_info.elements.page_markers import PERSON_INFO_PAGE_MARKER
+from tax_rpa.pages.shared.components.file_dialog import FileDialogComponent
+from tax_rpa.pages.shared.components.left_nav import LeftNavComponent
+from tax_rpa.pages.shared.components.toolbar import ToolbarComponent
 from tax_rpa.pages.shared.dialogs import PageDialogMixin
 from tax_rpa.runtime.context import RpaContext
 from tax_rpa.runtime.result import StepResult
 
 
 class PersonInfoPage(PageDialogMixin):
+    """人员信息采集页面对象，聚合页面组件并暴露业务动作。"""
     def __init__(
         self,
         context: RpaContext | None,
@@ -34,6 +35,7 @@ class PersonInfoPage(PageDialogMixin):
         import_result_reader: Callable[[], StepResult] | None = None,
         win32: Win32Driver | None = None,
     ) -> None:
+        """初始化人员信息页面实例，保存依赖、配置和运行上下文。"""
         self.context = context
         self.hwnd = hwnd
         self.toolbar = toolbar
@@ -46,6 +48,7 @@ class PersonInfoPage(PageDialogMixin):
         self.win32 = win32 or Win32Driver()
 
     def inspect(self) -> dict[str, Any]:
+        """采集当前页面的窗口、文本和关键控件信息，用于调试和诊断。"""
         if self.context is None:
             return {"ready": False}
 
@@ -82,9 +85,11 @@ class PersonInfoPage(PageDialogMixin):
         }
 
     def is_ready(self) -> bool:
+        """判断当前页面是否已经打开并具备继续操作的关键标识。"""
         return bool(self.inspect()["ready"])
 
     def open(self) -> StepResult:
+        """打开当前页面并等待页面关键标识出现。"""
         if self.context is None:
             return StepResult(ok=True, name="person_info_page.open", status="assumed_ready")
         before_dialog = self.close_message_dialog_if_present("cancel")
@@ -111,76 +116,8 @@ class PersonInfoPage(PageDialogMixin):
             error=result.error,
         )
 
-    def import_person_file(self, path: Path) -> StepResult:
-        from tax_rpa.pages.person_info.steps.import_person_file import ImportPersonFileStep
-        from tax_rpa.pages.person_info.steps.submit_import_data import SubmitImportDataStep
-        from tax_rpa.pages.person_info.steps.wait_import_result import WaitImportResultStep
-
-        import_file = ImportPersonFileStep(self).run(path)
-        if not import_file.ok:
-            return StepResult(
-                ok=False,
-                name="person_info_page.import_person_file",
-                status=import_file.status,
-                evidence=import_file.evidence,
-                error=import_file.error,
-            )
-
-        validation_result = WaitImportResultStep(self).run()
-        if validation_result.status == "ready_to_submit":
-            submit_result = SubmitImportDataStep(self).run()
-            if not submit_result.ok:
-                return StepResult(
-                    ok=False,
-                    name="person_info_page.import_person_file",
-                    status=submit_result.status,
-                    evidence={
-                        **import_file.evidence,
-                        "validation_result": validation_result,
-                        "submit_result": submit_result,
-                    },
-                    error=submit_result.error,
-                )
-            import_result = WaitImportResultStep(self).run()
-            if import_result.status == "ready_to_submit":
-                import_result = StepResult(
-                    ok=False,
-                    name=import_result.name,
-                    status="unknown",
-                    evidence={
-                        **import_result.evidence,
-                        "post_submit_status": "ready_to_submit",
-                    },
-                    error="Personnel import remained at submit-data confirmation after submit",
-                    error_type="UNKNOWN_RESULT",
-                    error_code="person_import_result_unknown",
-                    side_effect_started=True,
-                    side_effect_committed=True,
-                    retry_allowed=False,
-                )
-            evidence = {
-                **import_file.evidence,
-                "validation_result": validation_result,
-                "submit_result": submit_result,
-                "import_result": import_result,
-            }
-        else:
-            import_result = validation_result
-            evidence = {**import_file.evidence, "import_result": import_result}
-        return StepResult(
-            ok=import_result.ok,
-            name="person_info_page.import_person_file",
-            status=import_result.status,
-            evidence=evidence,
-            error=import_result.error,
-            error_type=import_result.error_type,
-            error_code=import_result.error_code,
-            side_effect_started=import_result.side_effect_started,
-            side_effect_committed=import_result.side_effect_committed,
-            retry_allowed=import_result.retry_allowed,
-        )
-
     def step(self, name: str, **data: Any):
+        """创建页面局部步骤上下文，用于记录日志和截图。"""
         logger = self.context.logger if self.context is not None else None
         step = getattr(logger, "step", None)
         if callable(step):
@@ -188,20 +125,24 @@ class PersonInfoPage(PageDialogMixin):
         return nullcontext()
 
     def _step(self, name: str, **data: Any):
+        """创建内部步骤上下文，供页面动作复用统一日志格式。"""
         return self.step(name, **data)
 
     def click_import_button(self) -> StepResult:
+        """点击当前页面的导入按钮，打开导入菜单或文件选择流程。"""
         if self.toolbar is not None:
             return self.toolbar.click_button(IMPORT_BUTTON.text)
         return self.default_toolbar().click_button(IMPORT_BUTTON.text)
 
     def choose_import_file_option(self) -> StepResult:
+        """从人员信息导入菜单中选择导入文件选项。"""
         import_option = IMPORT_FILE_OPTIONS[0].text
         if self.import_dropdown is not None:
             return self.import_dropdown.choose_item(import_option)
         return self.default_import_dropdown().choose_item(import_option)
 
     def click_submit_data(self) -> StepResult:
+        """点击人员信息导入后的提交数据按钮。"""
         if self.toolbar is not None:
             return self.toolbar.click_button(SUBMIT_DATA_BUTTON.text)
         return self.default_toolbar().click_button(SUBMIT_DATA_BUTTON.text)
@@ -211,6 +152,7 @@ class PersonInfoPage(PageDialogMixin):
         path: Path,
         dropdown_result: StepResult,
     ) -> StepResult | None:
+        """在文件选择框中选择人员信息 Excel 文件。"""
         dialog = dropdown_result.evidence.get("dialog")
         if self.file_dialog is not None:
             return self.file_dialog.choose_file(path)
@@ -225,11 +167,13 @@ class PersonInfoPage(PageDialogMixin):
         ).choose_file(path)
 
     def read_import_result(self) -> StepResult:
+        """读取人员信息导入结果并返回分类后的步骤结果。"""
         if self.import_result_reader is not None:
             return self.import_result_reader()
         return self.default_import_result_component().read_result()
 
     def default_toolbar(self) -> ToolbarComponent:
+        """创建当前页面默认工具栏组件。"""
         if self.context is None:
             raise RuntimeError("Default toolbar requires RpaContext")
         rect = self.win32.get_rect(self.hwnd)
@@ -245,9 +189,11 @@ class PersonInfoPage(PageDialogMixin):
         )
 
     def _default_toolbar(self) -> ToolbarComponent:
+        """构建当前页面内部使用的默认工具栏组件。"""
         return self.default_toolbar()
 
     def default_import_dropdown(self) -> ImportDropdownComponent:
+        """创建当前页面默认导入下拉组件。"""
         if self.context is None or self.context.main_window is None:
             raise RuntimeError("Default import dropdown requires RpaContext with main_window")
         allowed_pids = {int(self.context.main_window["pid"])}
@@ -261,9 +207,11 @@ class PersonInfoPage(PageDialogMixin):
         )
 
     def _default_import_dropdown(self) -> ImportDropdownComponent:
+        """构建当前页面内部使用的默认导入下拉组件。"""
         return self.default_import_dropdown()
 
     def default_import_result_component(self) -> ImportResultComponent:
+        """创建当前页面默认导入结果组件。"""
         if self.context is None or self.context.main_window is None:
             raise RuntimeError("Default import result requires RpaContext with main_window")
         allowed_pids = {int(self.context.main_window["pid"])}
@@ -276,19 +224,25 @@ class PersonInfoPage(PageDialogMixin):
         )
 
     def _click_import_button(self) -> StepResult:
+        """执行人员信息页面导入按钮点击的内部动作。"""
         return self.click_import_button()
 
     def _choose_import_file_option(self) -> StepResult:
+        """执行人员信息页面选择导入文件菜单项的内部动作。"""
         return self.choose_import_file_option()
 
     def _click_submit_data(self) -> StepResult:
+        """执行人员信息页面提交数据按钮点击的内部动作。"""
         return self.click_submit_data()
 
     def _choose_person_file(self, path: Path, dropdown_result: StepResult) -> StepResult | None:
+        """执行人员信息文件选择框处理的内部动作。"""
         return self.choose_person_file(path, dropdown_result)
 
     def _read_import_result(self) -> StepResult:
+        """执行人员信息导入结果读取的内部动作。"""
         return self.read_import_result()
 
     def _close_message_dialog_if_present(self) -> StepResult:
+        """执行页面弹窗关闭的内部动作。"""
         return self.close_message_dialog_if_present()

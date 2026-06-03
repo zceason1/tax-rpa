@@ -4,6 +4,7 @@ from pathlib import Path
 
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.runtime.result import StepResult
+from tax_rpa.runtime.workflow_options import WorkflowRuntimeOptions
 from tax_rpa.workflows.declaration_submission_workflow import (
     DeclarationSubmissionWorkflow,
 )
@@ -162,6 +163,22 @@ class Phase5WorkflowTests(unittest.TestCase):
                 self.assertEqual(result.status, "blocked")
                 self.assertEqual(result.error_type, "BLOCKED_BY_UNEXPECTED_DIALOG")
                 self.assertEqual(result.error_code, "unexpected_dialog")
+
+    def test_prefill_workflow_uses_runtime_options_for_pension_skip(self):
+        page = FakePhase5ComprehensivePage()
+        workflow = PrefillDeductionWorkflow(
+            self._config(),
+            logger=None,
+            runtime_options=WorkflowRuntimeOptions(
+                run_mode="execute_no_send",
+                allow_skip_personal_pension=True,
+            ),
+        )
+
+        result = workflow.run_on_app(FakePhase5App(page))
+
+        self.assertTrue(result.ok)
+        self.assertIn("confirm_prefill_options:True", page.events)
 
     def _config(self) -> PersonImportConfig:
         return PersonImportConfig(person_info_file=Path("person.xlsx"), dry_run=False)

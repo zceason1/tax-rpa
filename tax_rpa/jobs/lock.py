@@ -13,7 +13,9 @@ except ImportError:  # pragma: no cover - this project runs on Windows.
 
 
 class UiRunnerBusyError(RuntimeError):
+    """ui执行器busy错误异常，表示作业、锁中的特定错误场景。"""
     def __init__(self, active_job_id: str | None, metadata: dict[str, object]) -> None:
+        """初始化ui执行器busy错误实例，保存依赖、配置和运行上下文。"""
         super().__init__(f"UI runner is busy with job: {active_job_id or 'unknown'}")
         self.active_job_id = active_job_id
         self.metadata = metadata
@@ -21,11 +23,13 @@ class UiRunnerBusyError(RuntimeError):
 
 @dataclass(frozen=True)
 class UiRunnerLock:
+    """ui执行器锁，封装作业、锁相关状态和行为。"""
     lock_path: Path = Path("artifacts/runner.lock.json")
 
     _local_locks: ClassVar[dict[Path, dict[str, object]]] = {}
 
     def acquire(self, job_id: str) -> "UiRunnerLockLease":
+        """执行作业、锁中的acquire逻辑，供业务流程或相邻模块调用。"""
         metadata_path = self.lock_path.resolve()
         lock_file_path = _mutex_path(metadata_path)
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,6 +59,7 @@ class UiRunnerLock:
 
 @dataclass
 class UiRunnerLockLease:
+    """ui执行器锁lease，封装作业、锁相关状态和行为。"""
     lock_file_path: Path
     metadata_path: Path
     stream: BinaryIO
@@ -62,12 +67,14 @@ class UiRunnerLockLease:
     released: bool = False
 
     def heartbeat(self) -> None:
+        """执行作业、锁中的heartbeat逻辑，供业务流程或相邻模块调用。"""
         if self.released:
             return
         self.metadata["heartbeat_at"] = _now()
         _write_metadata(self.metadata_path, self.metadata)
 
     def release(self) -> None:
+        """执行作业、锁中的release逻辑，供业务流程或相邻模块调用。"""
         if self.released:
             return
         try:
@@ -78,13 +85,16 @@ class UiRunnerLockLease:
             self.released = True
 
     def __enter__(self) -> "UiRunnerLockLease":
+        """执行作业、锁中的内部辅助逻辑：enter。"""
         return self
 
     def __exit__(self, *_exc_info: object) -> None:
+        """执行作业、锁中的内部辅助逻辑：exit。"""
         self.release()
 
 
 def _build_metadata(job_id: str) -> dict[str, object]:
+    """执行作业、锁中的内部辅助逻辑：build元数据。"""
     now = _now()
     return {
         "job_id": job_id,
@@ -96,11 +106,13 @@ def _build_metadata(job_id: str) -> dict[str, object]:
 
 
 def _active_job_id(metadata: dict[str, object]) -> str | None:
+    """执行作业、锁中的内部辅助逻辑：active作业id。"""
     job_id = metadata.get("job_id")
     return str(job_id) if job_id else None
 
 
 def _lock_stream(stream: BinaryIO) -> None:
+    """执行作业、锁中的内部辅助逻辑：锁stream。"""
     if msvcrt is None:
         return
     stream.seek(0)
@@ -108,6 +120,7 @@ def _lock_stream(stream: BinaryIO) -> None:
 
 
 def _unlock_stream(stream: BinaryIO) -> None:
+    """执行作业、锁中的内部辅助逻辑：unlockstream。"""
     if msvcrt is None:
         return
     stream.seek(0)
@@ -115,6 +128,7 @@ def _unlock_stream(stream: BinaryIO) -> None:
 
 
 def _write_metadata(path: Path, metadata: dict[str, object]) -> None:
+    """写入元数据，并保持路径和数据格式受控。"""
     temp_path = path.with_name(f"{path.name}.tmp")
     temp_path.write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2),
@@ -124,6 +138,7 @@ def _write_metadata(path: Path, metadata: dict[str, object]) -> None:
 
 
 def _read_metadata(path: Path) -> dict[str, object]:
+    """读取元数据，并处理缺失或异常情况。"""
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
@@ -131,8 +146,10 @@ def _read_metadata(path: Path) -> dict[str, object]:
 
 
 def _now() -> str:
+    """生成当前 UTC 时间字符串，供状态和日志落盘使用。"""
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def _mutex_path(metadata_path: Path) -> Path:
+    """执行作业、锁中的内部辅助逻辑：mutex路径。"""
     return metadata_path.with_name(f"{metadata_path.name}.mutex")

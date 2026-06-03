@@ -31,10 +31,12 @@ MOUSEEVENTF_ABSOLUTE = 0x8000
 
 
 class POINT(ctypes.Structure):
+    """point，封装底层驱动、鼠标驱动相关状态和行为。"""
     _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
 
 
 def get_cursor_point() -> list[int]:
+    """执行底层驱动、鼠标驱动中的getcursorpoint逻辑，供业务流程或相邻模块调用。"""
     point = POINT()
     if not MouseGetCursorPos(ctypes.byref(point)):
         raise ctypes.WinError(ctypes.get_last_error())
@@ -42,6 +44,7 @@ def get_cursor_point() -> list[int]:
 
 
 def point_near(actual: list[int], expected: list[int], tolerance: int = 2) -> bool:
+    """执行底层驱动、鼠标驱动中的pointnear逻辑，供业务流程或相邻模块调用。"""
     return (
         abs(int(actual[0]) - int(expected[0])) <= tolerance
         and abs(int(actual[1]) - int(expected[1])) <= tolerance
@@ -49,6 +52,7 @@ def point_near(actual: list[int], expected: list[int], tolerance: int = 2) -> bo
 
 
 def to_absolute_mouse_coordinates(point: list[int], screen_size: list[int]) -> list[int]:
+    """执行底层驱动、鼠标驱动中的toabsolute鼠标coordinates逻辑，供业务流程或相邻模块调用。"""
     width = max(1, int(screen_size[0]) - 1)
     height = max(1, int(screen_size[1]) - 1)
     return [
@@ -58,7 +62,9 @@ def to_absolute_mouse_coordinates(point: list[int], screen_size: list[int]) -> l
 
 
 class MouseDriver:
+    """鼠标驱动驱动，封装底层系统能力，供页面组件调用。"""
     def move_to(self, point: list[int], settle_seconds: float = 0.15) -> dict[str, object]:
+        """执行底层驱动、鼠标驱动中的moveto逻辑，供业务流程或相邻模块调用。"""
         attempts = []
         for _attempt in range(5):
             MouseSetCursorPos(int(point[0]), int(point[1]))
@@ -99,6 +105,7 @@ class MouseDriver:
         )
 
     def click(self, point: list[int], press_seconds: float = 0.08) -> dict[str, object]:
+        """执行底层驱动、鼠标驱动中的click逻辑，供业务流程或相邻模块调用。"""
         move_result = self.move_to(point)
         MouseEvent(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, None)
         time.sleep(max(0.01, press_seconds))

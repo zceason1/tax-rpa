@@ -1,4 +1,5 @@
 def clamp_rect(rect: list[int]) -> list[int]:
+    """执行底层驱动、区域驱动中的clamp矩形区域逻辑，供业务流程或相邻模块调用。"""
     return [
         int(min(rect[0], rect[2])),
         int(min(rect[1], rect[3])),
@@ -8,11 +9,13 @@ def clamp_rect(rect: list[int]) -> list[int]:
 
 
 class RegionDriver:
+    """区域驱动驱动，封装底层系统能力，供页面组件调用。"""
     def detect_left_nav_rect(
         self,
         main_rect: list[int],
         children: list[dict],
     ) -> tuple[list[int], dict]:
+        """执行底层驱动、区域驱动中的detect左侧导航矩形区域逻辑，供业务流程或相邻模块调用。"""
         left, top, right, bottom = main_rect
         window_width = right - left
         window_height = bottom - top
@@ -52,6 +55,7 @@ class RegionDriver:
         nav_rect: list[int],
         children: list[dict],
     ) -> tuple[list[int], dict]:
+        """执行底层驱动、区域驱动中的detect内容矩形区域逻辑，供业务流程或相邻模块调用。"""
         left, top, right, bottom = main_rect
         nav_right = nav_rect[2]
         window_width = right - left

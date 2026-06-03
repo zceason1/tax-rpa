@@ -3,11 +3,13 @@ from pathlib import Path
 from typing import Any
 
 from tax_rpa.config.person_import import ImportFileConfig, PersonImportConfig
-from tax_rpa.jobs.action_policy import ActionAuditLogger, ActionPolicy
 from tax_rpa.jobs.artifact_store import JobArtifacts
 from tax_rpa.jobs.manifest import JobManifest
 from tax_rpa.jobs.observability import JobLogContext, JobObservability
+from tax_rpa.jobs.workflow_step_runner import JobStepRunner
+from tax_rpa.runtime.action_policy import ActionAuditLogger, ActionPolicy
 from tax_rpa.runtime.result import WorkflowResult
+from tax_rpa.runtime.workflow_options import WorkflowRuntimeOptions
 from tax_rpa.workflows.combined_tax_workflow import CombinedTaxWorkflow
 from tax_rpa.workflows.declaration_submission_workflow import (
     DeclarationSubmissionWorkflow,
@@ -15,7 +17,6 @@ from tax_rpa.workflows.declaration_submission_workflow import (
 from tax_rpa.workflows.export_report_workflow import ExportReportWorkflow
 from tax_rpa.workflows.import_person_info_workflow import ImportPersonInfoWorkflow
 from tax_rpa.workflows.import_salary_income_workflow import ImportSalaryIncomeWorkflow
-from tax_rpa.workflows.job_context import WorkflowJobContext
 from tax_rpa.workflows.prefill_deduction_workflow import PrefillDeductionWorkflow
 from tax_rpa.workflows.tax_calculation_workflow import TaxCalculationWorkflow
 from tax_rpa.workflows.update_special_deduction_workflow import (
@@ -24,6 +25,7 @@ from tax_rpa.workflows.update_special_deduction_workflow import (
 
 
 class ExistingWorkflowExecutor:
+    """既有工作流执行器，负责把作业清单转换为当前 UI 工作流执行。"""
     def __init__(
         self,
         *,
@@ -33,6 +35,7 @@ class ExistingWorkflowExecutor:
         reset: bool = False,
         include_phase5: bool = False,
     ) -> None:
+        """初始化既有工作流执行器实例，保存依赖、配置和运行上下文。"""
         self.base_dir = Path(base_dir)
         self.logger = logger or NullLogger()
         self.app_factory = app_factory
@@ -40,6 +43,7 @@ class ExistingWorkflowExecutor:
         self.include_phase5 = include_phase5
 
     def __call__(self, manifest: JobManifest, artifacts: JobArtifacts) -> dict[str, Any]:
+        """让实例可以像函数一样执行，作为作业执行器或适配器入口。"""
         action_policy = ActionPolicy(
             run_mode=manifest.run_mode,
             job_id=manifest.job_id,
@@ -57,11 +61,14 @@ class ExistingWorkflowExecutor:
                 correlation_id=f"{manifest.job_id}-combined_tax_workflow-start",
             ),
         )
-        job_context = WorkflowJobContext(
+        step_runner = JobStepRunner(
             manifest=manifest,
             artifacts=artifacts,
             observability=observability,
-            action_policy=action_policy,
+        )
+        runtime_options = WorkflowRuntimeOptions(
+            run_mode=manifest.run_mode,
+            allow_skip_personal_pension=manifest.allow_skip_personal_pension,
         )
         workflow = CombinedTaxWorkflow(
             config=self._config(manifest),
@@ -69,7 +76,9 @@ class ExistingWorkflowExecutor:
             reset=self.reset,
             app_factory=self.app_factory,
             workflow_factories=self._workflow_factories(),
-            job_context=job_context,
+            step_runner=step_runner,
+            runtime_options=runtime_options,
+            action_policy=action_policy,
         )
         result = workflow.run()
         return _workflow_result_to_executor_result(
@@ -78,51 +87,60 @@ class ExistingWorkflowExecutor:
         )
 
     def _workflow_factories(self) -> list[Any]:
+        """执行作业、既有工作流执行器中的内部辅助逻辑：工作流factories。"""
         factories: list[Any] = [
-            lambda config, logger, job_context=None: ImportPersonInfoWorkflow(
+            lambda config, logger, step_runner=None, runtime_options=None: ImportPersonInfoWorkflow(
                 config,
                 logger,
-                job_context=job_context,
+                step_runner=step_runner,
+                runtime_options=runtime_options,
             ),
-            lambda config, logger, job_context=None: UpdateSpecialDeductionWorkflow(
+            lambda config, logger, step_runner=None, runtime_options=None: UpdateSpecialDeductionWorkflow(
                 config,
                 logger,
-                job_context=job_context,
+                step_runner=step_runner,
+                runtime_options=runtime_options,
             ),
-            lambda config, logger, job_context=None: ImportSalaryIncomeWorkflow(
+            lambda config, logger, step_runner=None, runtime_options=None: ImportSalaryIncomeWorkflow(
                 config,
                 logger,
-                job_context=job_context,
+                step_runner=step_runner,
+                runtime_options=runtime_options,
             ),
         ]
         if self.include_phase5:
             factories.extend(
                 [
-                    lambda config, logger, job_context=None: PrefillDeductionWorkflow(
+                    lambda config, logger, step_runner=None, runtime_options=None: PrefillDeductionWorkflow(
                         config,
                         logger,
-                        job_context=job_context,
+                        step_runner=step_runner,
+                        runtime_options=runtime_options,
                     ),
-                    lambda config, logger, job_context=None: TaxCalculationWorkflow(
+                    lambda config, logger, step_runner=None, runtime_options=None: TaxCalculationWorkflow(
                         config,
                         logger,
-                        job_context=job_context,
+                        step_runner=step_runner,
+                        runtime_options=runtime_options,
                     ),
-                    lambda config, logger, job_context=None: DeclarationSubmissionWorkflow(
+                    lambda config, logger, step_runner=None, runtime_options=None: DeclarationSubmissionWorkflow(
                         config,
                         logger,
-                        job_context=job_context,
+                        step_runner=step_runner,
+                        runtime_options=runtime_options,
                     ),
-                    lambda config, logger, job_context=None: ExportReportWorkflow(
+                    lambda config, logger, step_runner=None, runtime_options=None: ExportReportWorkflow(
                         config,
                         logger,
-                        job_context=job_context,
+                        step_runner=step_runner,
+                        runtime_options=runtime_options,
                     ),
                 ]
             )
         return factories
 
     def _config(self, manifest: JobManifest) -> PersonImportConfig:
+        """执行作业、既有工作流执行器中的内部辅助逻辑：配置。"""
         person_file = self._resolve_manifest_file(manifest, "person_info")
         salary_file = self._resolve_manifest_file(manifest, "salary_income")
         return PersonImportConfig(
@@ -135,6 +153,7 @@ class ExistingWorkflowExecutor:
         )
 
     def _resolve_manifest_file(self, manifest: JobManifest, role: str) -> Path:
+        """解析清单文件，并转换为后续流程需要的规范形式。"""
         manifest_file = manifest.files[role]
         path = manifest_file.path
         if path.is_absolute():
@@ -143,16 +162,21 @@ class ExistingWorkflowExecutor:
 
 
 class NullLogger:
+    """null日志，封装作业、既有工作流执行器相关状态和行为。"""
     def log(self, *_args: Any, **_kwargs: Any) -> None:
+        """写入日志事件，记录当前动作或状态。"""
         return None
 
     def step(self, *_args: Any, **_kwargs: Any):
+        """创建页面局部步骤上下文，用于记录日志和截图。"""
         return nullcontext()
 
     def screenshot(self, *_args: Any, **_kwargs: Any) -> str:
+        """执行作业、既有工作流执行器中的截图逻辑，供业务流程或相邻模块调用。"""
         return ""
 
     def write_json(self, _name: str, _data: Any) -> str:
+        """把数据写入作业产物目录下的 JSON 文件。"""
         return ""
 
 
@@ -161,6 +185,7 @@ def _workflow_result_to_executor_result(
     *,
     include_phase5: bool = False,
 ) -> dict[str, Any]:
+    """执行作业、既有工作流执行器中的内部辅助逻辑：工作流结果to执行器结果。"""
     current_step = _current_step(result)
     return {
         "ok": result.ok,
@@ -179,6 +204,7 @@ def _workflow_result_to_executor_result(
 
 
 def _current_step(result: WorkflowResult) -> str | None:
+    """执行作业、既有工作流执行器中的内部辅助逻辑：当前步骤。"""
     business_results = result.evidence.get("business_results", [])
     if business_results:
         last_business = business_results[-1]
@@ -191,6 +217,7 @@ def _current_step(result: WorkflowResult) -> str | None:
 
 
 def _business_status(result: WorkflowResult, *, include_phase5: bool) -> str:
+    """执行作业、既有工作流执行器中的内部辅助逻辑：业务状态。"""
     if result.ok:
         return "phase5_workflows_completed" if include_phase5 else "existing_workflows_completed"
     return "phase5_workflow_failed" if include_phase5 else "existing_workflow_failed"

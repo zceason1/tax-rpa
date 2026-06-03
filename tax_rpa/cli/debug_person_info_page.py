@@ -12,6 +12,9 @@ from tax_rpa.app.tax_client_app import TaxClientApp
 from tax_rpa.config.person_import import PersonImportConfig, load_import_config
 from tax_rpa.drivers.logger import RunLogger, to_jsonable
 from tax_rpa.pages.person_info.page import PersonInfoPage
+from tax_rpa.pages.person_info.steps.import_person_file import ImportPersonFileStep
+from tax_rpa.pages.person_info.steps.submit_import_data import SubmitImportDataStep
+from tax_rpa.pages.person_info.steps.wait_import_result import WaitImportResultStep
 from tax_rpa.runtime.result import StepResult
 
 
@@ -20,6 +23,7 @@ shell32 = ctypes.windll.shell32
 
 
 def is_user_admin() -> bool:
+    """判断当前进程是否具备管理员权限。"""
     try:
         return bool(shell32.IsUserAnAdmin())
     except Exception:
@@ -27,6 +31,7 @@ def is_user_admin() -> bool:
 
 
 def relaunch_as_admin(argv: list[str]) -> None:
+    """以管理员权限重新启动当前命令。"""
     params = subprocess.list2cmdline(["-m", MODULE_NAME, *argv])
     result = shell32.ShellExecuteW(
         None,
@@ -41,6 +46,7 @@ def relaunch_as_admin(argv: list[str]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    """解析命令行参数，返回入口函数使用的参数对象。"""
     parser = argparse.ArgumentParser(
         description="Attach to the withholding client and debug the personnel information page."
     )
@@ -83,6 +89,7 @@ def with_debug_options(
     timeout_seconds: int,
     force_dry_run: bool,
 ) -> PersonImportConfig:
+    """派生调试配置，缩短等待时间并按需强制 dry-run。"""
     timeout = max(1, int(timeout_seconds))
     return replace(
         config,
@@ -95,6 +102,7 @@ def with_debug_options(
 
 
 def attach_app(config: PersonImportConfig, logger: RunLogger, launch: bool) -> TaxClientApp:
+    """根据配置创建并连接税务客户端应用对象。"""
     app = TaxClientApp(config, logger)
     if launch:
         start_result = app.start_if_needed()
@@ -118,6 +126,7 @@ def run_debug_action(
     logger: RunLogger,
     launch: bool,
 ) -> dict[str, Any]:
+    """执行指定调试动作，用于定位页面或控件问题。"""
     app = attach_app(config, logger, launch=launch)
     if app.context.hwnd is None:
         raise RuntimeError("Main window is not available")
@@ -147,16 +156,65 @@ def run_debug_action(
                     error=open_result.error,
                 ),
             }
-        import_result = page.import_person_file(config.person_info_file)
+        import_file = ImportPersonFileStep(page).run(config.person_info_file)
+        if not import_file.ok:
+            return {
+                "action": action,
+                "open": open_result,
+                "import_file": import_file,
+                "result": import_file,
+            }
+
+        validation_result = WaitImportResultStep(page).run()
+        if validation_result.status != "ready_to_submit":
+            return {
+                "action": action,
+                "open": open_result,
+                "import_file": import_file,
+                "result": validation_result,
+            }
+
+        submit_result = SubmitImportDataStep(page).run()
+        if not submit_result.ok:
+            return {
+                "action": action,
+                "open": open_result,
+                "import_file": import_file,
+                "validation_result": validation_result,
+                "submit_result": submit_result,
+                "result": submit_result,
+            }
+
+        import_result = WaitImportResultStep(page).run()
+        if import_result.status == "ready_to_submit":
+            import_result = StepResult(
+                ok=False,
+                name=import_result.name,
+                status="unknown",
+                evidence={
+                    **import_result.evidence,
+                    "post_submit_status": "ready_to_submit",
+                },
+                error="Personnel import remained at submit-data confirmation after submit",
+                error_type="UNKNOWN_RESULT",
+                error_code="person_import_result_unknown",
+                side_effect_started=True,
+                side_effect_committed=True,
+                retry_allowed=False,
+            )
         return {
             "action": action,
             "open": open_result,
+            "import_file": import_file,
+            "validation_result": validation_result,
+            "submit_result": submit_result,
             "result": import_result,
         }
     raise ValueError(f"Unsupported debug action: {action}")
 
 
 def main() -> None:
+    """命令行入口，解析参数并触发对应业务流程。"""
     args = parse_args()
     if not args.no_self_elevate and not is_user_admin():
         relaunch_as_admin(sys.argv[1:])

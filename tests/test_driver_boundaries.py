@@ -3,11 +3,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from tax_rpa.components.file_dialog import FileDialogComponent
-from tax_rpa.components.import_dropdown import ImportDropdownComponent
-from tax_rpa.components.left_nav import LeftNavComponent
-from tax_rpa.components.message_dialog import MessageDialogComponent, close_blocking_dialogs
-from tax_rpa.components.toolbar import ToolbarComponent
+from tax_rpa.pages.person_info.components.import_dropdown import ImportDropdownComponent
+from tax_rpa.pages.shared.components.file_dialog import FileDialogComponent
+from tax_rpa.pages.shared.components.left_nav import LeftNavComponent
+from tax_rpa.pages.shared.components.message_dialog import MessageDialogComponent, close_blocking_dialogs
+from tax_rpa.pages.shared.components.toolbar import ToolbarComponent
 
 
 class FakeLogger:
@@ -126,6 +126,59 @@ class DriverBoundaryTests(unittest.TestCase):
         self.assertEqual(mouse.clicked, [[20, 30]])
         self.assertIn(("set_window_text", 30, "persons.xlsx"), calls)
         self.assertIn(("wait_for_dialog_closed", 40, 30), calls)
+
+    def test_file_dialog_dry_run_closes_dialog_with_cancel_button(self):
+        calls = []
+
+        class FakeWin32:
+            def collect_children(self, hwnd):
+                calls.append(("collect_children", hwnd))
+                return [
+                    {"class": "Button", "title": "\u53d6\u6d88", "visible": True, "rect": [10, 20, 90, 50]},
+                    {"class": "Button", "title": "\u6253\u5f00", "visible": True, "rect": [100, 20, 180, 50]},
+                ]
+
+            def find_largest_edit_control(self, dialog_hwnd):
+                calls.append(("find_largest_edit_control", dialog_hwnd))
+                return {"hwnd": 30, "class": "Edit", "rect": [1, 2, 3, 4]}
+
+            def find_button_by_labels(self, children, labels):
+                calls.append(("find_button_by_labels", tuple(labels)))
+                for child in children:
+                    if child["title"] in labels:
+                        return child
+                return None
+
+            def set_foreground(self, hwnd):
+                calls.append(("set_foreground", hwnd))
+
+            def rect_center(self, rect):
+                calls.append(("rect_center", rect))
+                return [45, 35]
+
+            def wait_for_dialog_closed(self, hwnd, timeout_seconds):
+                calls.append(("wait_for_dialog_closed", hwnd, timeout_seconds))
+                return True
+
+        mouse = FakeMouse()
+        component = FileDialogComponent(
+            dialog={"hwnd": 40, "rect": [0, 0, 100, 100]},
+            logger=FakeLogger(),
+            dry_run=True,
+            mouse=mouse,
+            win32=FakeWin32(),
+        )
+
+        result = component.choose_file(Path("persons.xlsx"))
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.status, "dry_run")
+        self.assertEqual(mouse.clicked, [[45, 35]])
+        self.assertIn(("wait_for_dialog_closed", 40, 5), calls)
+        self.assertEqual(
+            result.evidence["result"]["dry_run_close"]["method"],
+            "cancel_button",
+        )
 
     def test_left_nav_uses_injected_win32_for_window_geometry(self):
         calls = []

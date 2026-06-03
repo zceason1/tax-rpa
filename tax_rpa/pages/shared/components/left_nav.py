@@ -1,11 +1,11 @@
 import time
 from typing import Any
 
-from tax_rpa.config.person_import import assert_safe_action
 from tax_rpa.drivers.ocr_driver import OcrDriver
 from tax_rpa.drivers.region_driver import RegionDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
-from tax_rpa.jobs.action_policy import ActionPolicy
+from tax_rpa.runtime.action_guard import assert_safe_action
+from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
 
 
@@ -13,10 +13,12 @@ def should_try_home_card_fallback(
     page_match: dict[str, Any] | None,
     import_match: dict[str, Any] | None,
 ) -> bool:
+    """判断是否需要使用首页卡片兜底方式打开页面。"""
     return bool(page_match and not import_match)
 
 
 class LeftNavComponent:
+    """共享左侧导航组件，负责打开指定业务页面并验证页面就绪。"""
     def __init__(
         self,
         hwnd: int,
@@ -27,6 +29,7 @@ class LeftNavComponent:
         win32: Win32Driver | None = None,
         action_policy: ActionPolicy | None = None,
     ) -> None:
+        """初始化左侧导航component实例，保存依赖、配置和运行上下文。"""
         self.hwnd = hwnd
         self.logger = logger
         self.config = config
@@ -36,6 +39,7 @@ class LeftNavComponent:
         self.action_policy = action_policy or ActionPolicy(run_mode="execute_no_send")
 
     def open_page(self, text: str, ready_check=None) -> StepResult:
+        """通过左侧导航打开目标页面，并等待页面就绪。"""
         decision = self.action_policy.before_click(
             text,
             {"step_name": "left_nav.open_page"},

@@ -1,4 +1,4 @@
-from tax_rpa.utils import normalize_text
+from tax_rpa.runtime.text import normalize_text
 
 
 RESULT_TEXTS = {
@@ -29,6 +29,7 @@ RESULT_TEXTS = {
 
 
 def classify_salary_income_import_result(texts: list[str]) -> str:
+    """根据工资薪金导入反馈文本分类导入结果。"""
     joined = normalize_text(" ".join(texts))
     if any(keyword in joined for keyword in RESULT_TEXTS["failed"]):
         return "failed"

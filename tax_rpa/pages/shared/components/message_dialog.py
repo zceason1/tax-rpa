@@ -1,9 +1,9 @@
 from typing import Any
 
-from tax_rpa.constants import FILE_DIALOG_TITLE_HINTS
-from tax_rpa.drivers.mouse_driver import MouseDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
-from tax_rpa.jobs.action_policy import ActionPolicy
+from tax_rpa.drivers.mouse_driver import MouseDriver
+from tax_rpa.pages.shared.elements.dialogs import FILE_DIALOG_TITLE_HINTS
+from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
 
 CONFIRM_BUTTON_TEXTS = ("确定", "确认", "是", "OK", "Yes")
@@ -12,6 +12,7 @@ DialogAction = str
 
 
 def is_blocking_dialog(window: dict[str, Any]) -> bool:
+    """判断窗口是否像阻塞业务操作的弹窗。"""
     class_name = str(window.get("class", ""))
     title = str(window.get("title", ""))
     area = int(window.get("area", 0) or 0)
@@ -28,6 +29,7 @@ def collect_blocking_dialogs(
     allowed_pids: set[int],
     win32: Win32Driver | None = None,
 ) -> list[dict[str, Any]]:
+    """收集当前主窗口附近的阻塞弹窗。"""
     driver = win32 or Win32Driver()
     dialogs = []
     for window in driver.collect_top_windows():
@@ -47,6 +49,7 @@ def close_blocking_dialogs(
     mouse: MouseDriver | None = None,
     win32: Win32Driver | None = None,
 ) -> list[dict[str, Any]]:
+    """按指定动作关闭收集到的阻塞弹窗。"""
     import time
 
     driver = win32 or Win32Driver()
@@ -93,6 +96,7 @@ def close_blocking_dialogs(
 
 
 class MessageDialogComponent:
+    """共享消息弹窗组件，负责发现并关闭阻塞业务弹窗。"""
     def __init__(
         self,
         allowed_pids: set[int],
@@ -102,6 +106,7 @@ class MessageDialogComponent:
         mouse: MouseDriver | None = None,
         action_policy: ActionPolicy | None = None,
     ) -> None:
+        """初始化message弹窗component实例，保存依赖、配置和运行上下文。"""
         self.allowed_pids = allowed_pids
         self.logger = logger
         self.dry_run = dry_run
@@ -110,9 +115,11 @@ class MessageDialogComponent:
         self.action_policy = action_policy or ActionPolicy(run_mode="execute_no_send")
 
     def close_if_present(self) -> StepResult:
+        """检测是否存在阻塞弹窗，存在时按默认动作关闭。"""
         return self.close_with_action("escape")
 
     def close_with_action(self, action: DialogAction) -> StepResult:
+        """按指定动作关闭阻塞弹窗，并记录关闭结果。"""
         action_type = "dialog_confirm" if action == "confirm" else "read_only_click"
         decision = self.action_policy.before_action(
             label=f"dialog_{action}",

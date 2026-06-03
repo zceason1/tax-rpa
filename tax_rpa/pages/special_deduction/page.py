@@ -1,8 +1,6 @@
 from contextlib import nullcontext
 from typing import Any
 
-from tax_rpa.components.content_text import ContentTextComponent
-from tax_rpa.components.left_nav import LeftNavComponent
 from tax_rpa.drivers.mouse_driver import MouseDriver
 from tax_rpa.drivers.ocr_driver import OcrDriver, find_best_ocr_match, ocr_rect
 from tax_rpa.drivers.region_driver import RegionDriver
@@ -14,12 +12,15 @@ from tax_rpa.pages.special_deduction.elements.download_update import (
 from tax_rpa.pages.special_deduction.elements.page_markers import (
     SPECIAL_DEDUCTION_PAGE_MARKER,
 )
+from tax_rpa.pages.shared.components.content_text import ContentTextComponent
+from tax_rpa.pages.shared.components.left_nav import LeftNavComponent
 from tax_rpa.pages.shared.dialogs import PageDialogMixin
 from tax_rpa.runtime.context import RpaContext
 from tax_rpa.runtime.result import StepResult
 
 
 class SpecialDeductionPage(PageDialogMixin):
+    """专项附加扣除页面对象，封装页面识别和下载更新动作。"""
     def __init__(
         self,
         context: RpaContext | None,
@@ -30,6 +31,7 @@ class SpecialDeductionPage(PageDialogMixin):
         mouse: MouseDriver | None = None,
         win32: Win32Driver | None = None,
     ) -> None:
+        """初始化专项扣除页面实例，保存依赖、配置和运行上下文。"""
         self.context = context
         self.hwnd = hwnd
         self.toolbar = toolbar
@@ -41,6 +43,7 @@ class SpecialDeductionPage(PageDialogMixin):
         self.win32 = win32 or Win32Driver()
 
     def inspect(self) -> dict[str, Any]:
+        """采集当前页面的窗口、文本和关键控件信息，用于调试和诊断。"""
         if self.context is None:
             return {"ready": False}
 
@@ -81,9 +84,11 @@ class SpecialDeductionPage(PageDialogMixin):
         }
 
     def is_ready(self) -> bool:
+        """判断当前页面是否已经打开并具备继续操作的关键标识。"""
         return bool(self.inspect()["ready"])
 
     def open(self) -> StepResult:
+        """打开当前页面并等待页面关键标识出现。"""
         if self.context is None:
             return StepResult(ok=True, name="special_deduction_page.open", status="assumed_ready")
         before_dialog = self.close_message_dialog_if_present("cancel")
@@ -111,6 +116,7 @@ class SpecialDeductionPage(PageDialogMixin):
         )
 
     def step(self, name: str, **data: Any):
+        """创建页面局部步骤上下文，用于记录日志和截图。"""
         logger = self.context.logger if self.context is not None else None
         step = getattr(logger, "step", None)
         if callable(step):
@@ -118,9 +124,11 @@ class SpecialDeductionPage(PageDialogMixin):
         return nullcontext()
 
     def click_download_update(self) -> StepResult:
+        """点击专项附加扣除页面的下载更新按钮。"""
         return self._content_text().click_text(DOWNLOAD_UPDATE_BUTTON.text)
 
     def click_all_persons(self) -> StepResult:
+        """点击专项附加扣除下载更新中的全部人员选项。"""
         return self._content_text().click_text(ALL_PERSONS_OPTION.text)
 
     def click_all_persons_fallback(
@@ -128,6 +136,7 @@ class SpecialDeductionPage(PageDialogMixin):
         download_result: StepResult,
         error: Exception | None = None,
     ) -> StepResult:
+        """在 OCR 未找到目标时，使用页面布局推算全部人员按钮位置。"""
         click_info = download_result.evidence.get("click", {})
         origin = click_info.get("click")
         match = click_info.get("match", {})
@@ -186,6 +195,7 @@ class SpecialDeductionPage(PageDialogMixin):
         )
 
     def default_content_text(self) -> ContentTextComponent:
+        """创建当前页面默认内容文本组件。"""
         if self.context is None:
             raise RuntimeError("Default content text requires RpaContext")
         return ContentTextComponent(
@@ -197,11 +207,13 @@ class SpecialDeductionPage(PageDialogMixin):
         )
 
     def _content_text(self) -> Any:
+        """构建当前页面内部使用的内容文本组件。"""
         if self.content_text is not None:
             return self.content_text
         return self.default_content_text()
 
     def _content_rect(self) -> list[int]:
+        """计算当前页面内容区域边界，供 OCR 点击限制范围。"""
         rect = self.win32.get_rect(self.hwnd)
         children = self.win32.collect_children(self.hwnd)
         nav_rect, _ = self.region.detect_left_nav_rect(rect, children)

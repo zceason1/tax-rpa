@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tax_rpa.jobs.action_policy import ActionAuditLogger, ActionPolicy
 from tax_rpa.jobs.manifest import JobManifest
 from tax_rpa.jobs.submit_authorization import SubmitAuthorization
+from tax_rpa.runtime.action_policy import ActionAuditLogger, ActionPolicy
 
 
 def manifest(**overrides) -> JobManifest:

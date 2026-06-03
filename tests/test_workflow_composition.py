@@ -1,8 +1,10 @@
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.runtime.result import StepResult, WorkflowResult
+from tax_rpa.runtime.step_runner import DirectStepRunner
 from tax_rpa.workflows.combined_tax_workflow import CombinedTaxWorkflow
 
 
@@ -319,6 +321,35 @@ class WorkflowCompositionTests(unittest.TestCase):
 
         self.assertFalse(result.ok)
         self.assertEqual(events, ["start", "wait_login", "business:side_effect"])
+
+    def test_combined_workflow_attaches_explicit_action_policy_not_step_runner_policy(self):
+        events = []
+        policy = object()
+        holder = {}
+
+        class FakeAppWithContext(FakeApp):
+            def __init__(self, events):
+                super().__init__(events)
+                self.context = SimpleNamespace(action_policy=None)
+
+        def app_factory(_config, _logger):
+            app = FakeAppWithContext(events)
+            holder["app"] = app
+            return app
+
+        workflow = CombinedTaxWorkflow(
+            config=PersonImportConfig(person_info_file=Path("persons.xlsx")),
+            logger=None,
+            workflow_factories=[],
+            app_factory=app_factory,
+            step_runner=DirectStepRunner(),
+            action_policy=policy,
+        )
+
+        result = workflow.run()
+
+        self.assertTrue(result.ok)
+        self.assertIs(holder["app"].context.action_policy, policy)
 
 
 if __name__ == "__main__":

@@ -1,15 +1,18 @@
 from pathlib import Path
 from typing import Any
 
-from tax_rpa.constants import OPEN_BUTTON_TEXTS
-from tax_rpa.config.person_import import assert_safe_action
 from tax_rpa.drivers.mouse_driver import MouseDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
-from tax_rpa.jobs.action_policy import ActionPolicy
+from tax_rpa.pages.shared.elements.dialogs import OPEN_BUTTON_TEXTS
+from tax_rpa.runtime.action_guard import assert_safe_action
+from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
+
+CANCEL_BUTTON_TEXTS = ("\u53d6\u6d88", "\u5173\u95ed", "Cancel")
 
 
 class FileDialogComponent:
+    """共享文件选择框组件，负责填入 Excel 路径并按执行模式提交或取消。"""
     def __init__(
         self,
         dialog: dict[str, Any],
@@ -19,6 +22,7 @@ class FileDialogComponent:
         win32: Win32Driver | None = None,
         action_policy: ActionPolicy | None = None,
     ) -> None:
+        """初始化文件弹窗component实例，保存依赖、配置和运行上下文。"""
         self.dialog = dialog
         self.logger = logger
         self.dry_run = dry_run
@@ -27,6 +31,7 @@ class FileDialogComponent:
         self.action_policy = action_policy or ActionPolicy(run_mode="execute_no_send")
 
     def choose_file(self, path: Path) -> StepResult:
+        """在文件选择框中填入文件路径，并根据运行模式提交或取消。"""
         decision = self.action_policy.before_action(
             label="open file",
             action_type="file_submit",
@@ -51,6 +56,7 @@ class FileDialogComponent:
         }
         self.logger.log("fill_file_dialog", "dry_run" if self.dry_run else "start", **result)
         if self.dry_run:
+            result["dry_run_close"] = self._close_dry_run_dialog(dialog_hwnd)
             return StepResult(
                 ok=True,
                 name="file_dialog.choose_file",
@@ -89,3 +95,24 @@ class FileDialogComponent:
             status=result.get("submit_method", "submitted"),
             evidence={"result": result},
         )
+
+    def _close_dry_run_dialog(self, dialog_hwnd: int) -> dict[str, Any]:
+        """在 dry-run 模式下关闭文件选择框，避免模态窗口阻塞后续导航。"""
+        self.win32.set_foreground(dialog_hwnd)
+        children = self.win32.collect_children(dialog_hwnd)
+        cancel_button = self.win32.find_button_by_labels(children, CANCEL_BUTTON_TEXTS)
+        if cancel_button is not None:
+            click_result = self.mouse.click(self.win32.rect_center(cancel_button["rect"]))
+            closed = self.win32.wait_for_dialog_closed(dialog_hwnd, 5)
+            return {
+                "method": "cancel_button",
+                "button": cancel_button,
+                "click_result": click_result,
+                "closed": closed,
+            }
+
+        import pyautogui
+
+        pyautogui.press("esc")
+        closed = self.win32.wait_for_dialog_closed(dialog_hwnd, 5)
+        return {"method": "escape_key", "closed": closed}

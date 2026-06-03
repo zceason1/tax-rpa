@@ -2,7 +2,7 @@ import unittest
 from contextlib import nullcontext
 from types import SimpleNamespace
 
-from tax_rpa.jobs.action_policy import ActionPolicy
+from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.pages.special_deduction.elements.download_update import DOWNLOAD_UPDATE_BUTTON
 from tax_rpa.pages.special_deduction.page import SpecialDeductionPage
 from tax_rpa.pages.special_deduction.steps.download_update_all_persons import (

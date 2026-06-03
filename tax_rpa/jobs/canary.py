@@ -11,6 +11,7 @@ Probe = Callable[["CanaryTarget"], dict[str, Any]]
 
 @dataclass(frozen=True)
 class CanaryTarget:
+    """金丝雀验证目标，封装作业、金丝雀验证相关状态和行为。"""
     target_id: str
     label: str
     target_type: str
@@ -19,6 +20,7 @@ class CanaryTarget:
 
 @dataclass(frozen=True)
 class CanaryRunResult:
+    """金丝雀验证run结果结果对象，承载执行状态、证据和后续判断所需字段。"""
     passed: bool
     record_path: str
     maintenance_ticket_path: str | None = None
@@ -26,6 +28,7 @@ class CanaryRunResult:
 
 @dataclass(frozen=True)
 class CanaryRunner:
+    """金丝雀验证运行器，负责探测真实客户端关键路径并写入验证记录。"""
     artifacts_root: Path = Path("artifacts")
     timestamp: str | None = None
     tax_client_version_reader: Callable[[], str] | None = None
@@ -37,6 +40,7 @@ class CanaryRunner:
         run_mode: str,
         targets: list[CanaryTarget],
     ) -> CanaryRunResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         timestamp = self.timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
         canary_dir = self.artifacts_root / "canary" / timestamp
         canary_dir.mkdir(parents=True, exist_ok=True)
@@ -87,6 +91,7 @@ class CanaryRunner:
         )
 
     def _probe_target(self, target: CanaryTarget) -> dict[str, Any]:
+        """执行作业、金丝雀验证中的内部辅助逻辑：探测目标。"""
         probe = self.probe or _default_probe
         result = probe(target)
         return {
@@ -103,6 +108,7 @@ class CanaryRunner:
 
 
 def _read_tax_client_version(reader: Callable[[], str] | None) -> str:
+    """读取税务客户端版本，并处理缺失或异常情况。"""
     if reader is None:
         return "unknown"
     try:
@@ -114,10 +120,12 @@ def _read_tax_client_version(reader: Callable[[], str] | None) -> str:
 
 
 def _default_probe(_target: CanaryTarget) -> dict[str, Any]:
+    """执行作业、金丝雀验证中的内部辅助逻辑：default探测。"""
     return {"found": False, "score": None, "ocr_text": ""}
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> Path:
+    """写入JSON，并保持路径和数据格式受控。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_name(f"{path.name}.tmp")
     temp_path.write_text(

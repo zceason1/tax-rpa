@@ -14,7 +14,7 @@ from tax_rpa.pages.comprehensive_income.steps.tax_calculation import (
     TaxCalculationStep,
 )
 from tax_rpa.runtime.result import StepResult
-from tax_rpa.workflows.result_matrix import classify_step_result
+from tax_rpa.runtime.result_matrix import classify_step_result
 
 
 class Phase5BusinessStepTests(unittest.TestCase):

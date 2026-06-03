@@ -21,11 +21,13 @@ TERMINAL_STATES = {"succeeded", "failed", "cancelled"}
 
 
 class StateTransitionError(ValueError):
+    """状态流转错误异常，表示作业、状态存储中的特定错误场景。"""
     pass
 
 
 @dataclass(frozen=True)
 class JobStateRecord:
+    """作业状态记录，封装作业、状态存储相关状态和行为。"""
     job_id: str
     state: str
     started_at: str
@@ -42,13 +44,16 @@ class JobStateRecord:
 
 
 class StateStore:
+    """作业状态存储，负责初始化、读取和合法状态流转。"""
     def __init__(self, job_root: str | Path) -> None:
+        """初始化状态存储实例，保存依赖、配置和运行上下文。"""
         self.job_root = Path(job_root)
         self.state_path = self.job_root / "state.json"
         self.logs_dir = self.job_root / "logs"
         self.transition_log_path = self.logs_dir / "state_transitions.jsonl"
 
     def initialize(self, job_id: str) -> JobStateRecord:
+        """初始化作业相关目录或状态文件。"""
         now = _now()
         record = JobStateRecord(
             job_id=job_id,
@@ -65,6 +70,7 @@ class StateStore:
         return record
 
     def load(self) -> JobStateRecord:
+        """读取配置、状态或记录，并转换成当前模块使用的对象。"""
         data = json.loads(self.state_path.read_text(encoding="utf-8"))
         return JobStateRecord(**data)
 
@@ -81,6 +87,7 @@ class StateStore:
         artifact_manifest_path: str | None = None,
         callback_delivery_state: str | None = None,
     ) -> JobStateRecord:
+        """执行作业状态流转，并写入状态文件和流转日志。"""
         current = self.load()
         _assert_allowed_transition(current.state, to_state)
         now = _now()
@@ -114,6 +121,7 @@ class StateStore:
         *,
         artifact_manifest_path: str | None = None,
     ) -> JobStateRecord:
+        """更新作业回调投递状态。"""
         current = self.load()
         now = _now()
         record = dataclasses.replace(
@@ -127,6 +135,7 @@ class StateStore:
         return record
 
     def _write_state(self, record: JobStateRecord) -> None:
+        """把当前作业状态写入状态文件。"""
         self.job_root.mkdir(parents=True, exist_ok=True)
         temp_path = self.state_path.with_name(f"{self.state_path.name}.tmp")
         temp_path.write_text(
@@ -142,6 +151,7 @@ class StateStore:
         from_state: str | None,
         record: JobStateRecord,
     ) -> None:
+        """追加一条状态流转记录，便于追踪作业生命周期。"""
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         event = {
             "time": record.updated_at,
@@ -161,6 +171,7 @@ class StateStore:
 
 
 def _assert_allowed_transition(from_state: str, to_state: str) -> None:
+    """执行作业、状态存储中的内部辅助逻辑：assert允许结果流转。"""
     if to_state not in ALLOWED_TRANSITIONS:
         raise StateTransitionError(f"Unknown target state: {to_state}")
     if to_state not in ALLOWED_TRANSITIONS.get(from_state, set()):
@@ -168,10 +179,12 @@ def _assert_allowed_transition(from_state: str, to_state: str) -> None:
 
 
 def _now() -> str:
+    """生成当前 UTC 时间字符串，供状态和日志落盘使用。"""
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def _to_jsonable(value: Any) -> Any:
+    """把路径、数据类和嵌套对象转换为可 JSON 序列化结构。"""
     if dataclasses.is_dataclass(value):
         return _to_jsonable(dataclasses.asdict(value))
     if isinstance(value, dict):

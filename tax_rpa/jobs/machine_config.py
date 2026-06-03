@@ -8,7 +8,9 @@ from tax_rpa.jobs.redaction import redact_sensitive
 
 
 class MachineConfigValidationError(ValueError):
+    """机器配置validation错误异常，表示作业、机器配置中的特定错误场景。"""
     def __init__(self, message: str, error_code: str) -> None:
+        """初始化机器配置validation错误实例，保存依赖、配置和运行上下文。"""
         super().__init__(message)
         self.error_type = "SYSTEM_ENVIRONMENT_ERROR"
         self.error_code = error_code
@@ -16,36 +18,44 @@ class MachineConfigValidationError(ValueError):
 
 @dataclass(frozen=True)
 class MachineConfig:
+    """机器配置对象，描述真实客户端运行所需的本机环境。"""
     path: Path
     data: dict[str, Any]
 
     @property
     def schema_version(self) -> int:
+        """执行作业、机器配置中的schema版本逻辑，供业务流程或相邻模块调用。"""
         return int(self.data["schema_version"])
 
     @property
     def ocr_engine(self) -> str:
+        """执行作业、机器配置中的OCR识别engine逻辑，供业务流程或相邻模块调用。"""
         return str(self.data["ocr"]["engine"])
 
     def to_summary_dict(self) -> dict[str, Any]:
+        """执行作业、机器配置中的to摘要dict逻辑，供业务流程或相邻模块调用。"""
         return redact_sensitive(self.data)
 
 
 @dataclass(frozen=True)
 class MachineConfigValidationResult:
+    """机器配置validation结果结果对象，承载执行状态、证据和后续判断所需字段。"""
     issues: list[PreflightIssue]
     config: MachineConfig | None = None
 
     @property
     def ok(self) -> bool:
+        """判断当前结果是否满足成功条件。"""
         return not self.issues
 
 
 @dataclass(frozen=True)
 class MachineConfigValidator:
+    """机器配置validator，封装作业、机器配置相关状态和行为。"""
     path: Path = Path("config/machine_config.json")
 
     def validate(self) -> MachineConfigValidationResult:
+        """校验输入对象是否满足当前模块的规则。"""
         try:
             return MachineConfigValidationResult(
                 issues=[],
@@ -66,6 +76,7 @@ class MachineConfigValidator:
 
 
 def load_machine_config(path: str | Path) -> MachineConfig:
+    """加载机器配置，并转换为当前模块使用的数据对象。"""
     config_path = Path(path)
     if not config_path.exists():
         raise MachineConfigValidationError(
@@ -125,6 +136,7 @@ def load_machine_config(path: str | Path) -> MachineConfig:
 
 
 def _require_section(data: dict[str, Any], key: str) -> dict[str, Any]:
+    """执行作业、机器配置中的内部辅助逻辑：requiresection。"""
     value = data.get(key)
     if not isinstance(value, dict):
         raise MachineConfigValidationError(
@@ -135,6 +147,7 @@ def _require_section(data: dict[str, Any], key: str) -> dict[str, Any]:
 
 
 def _require_equal(data: dict[str, Any], key: str, expected: Any) -> None:
+    """执行作业、机器配置中的内部辅助逻辑：requireequal。"""
     if data.get(key) != expected:
         raise MachineConfigValidationError(
             f"machine_config.{key} must be {expected!r}",
@@ -143,6 +156,7 @@ def _require_equal(data: dict[str, Any], key: str, expected: Any) -> None:
 
 
 def _require_str(data: dict[str, Any], key: str) -> str:
+    """执行作业、机器配置中的内部辅助逻辑：requirestr。"""
     value = data.get(key)
     if not isinstance(value, str) or not value.strip():
         raise MachineConfigValidationError(
@@ -153,6 +167,7 @@ def _require_str(data: dict[str, Any], key: str) -> str:
 
 
 def _require_number(data: dict[str, Any], key: str) -> float:
+    """执行作业、机器配置中的内部辅助逻辑：requirenumber。"""
     value = data.get(key)
     if not isinstance(value, (int, float)):
         raise MachineConfigValidationError(
@@ -163,6 +178,7 @@ def _require_number(data: dict[str, Any], key: str) -> float:
 
 
 def _require_positive_number(data: dict[str, Any], key: str) -> float:
+    """执行作业、机器配置中的内部辅助逻辑：requirepositivenumber。"""
     value = _require_number(data, key)
     if value <= 0:
         raise MachineConfigValidationError(

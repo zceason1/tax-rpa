@@ -2,10 +2,6 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
-from tax_rpa.components.content_text import ContentTextComponent
-from tax_rpa.components.file_dialog import FileDialogComponent
-from tax_rpa.components.left_nav import LeftNavComponent
-from tax_rpa.components.toolbar import ToolbarComponent
 from tax_rpa.drivers.ocr_driver import OcrDriver, find_best_ocr_match, ocr_rect
 from tax_rpa.drivers.region_driver import RegionDriver
 from tax_rpa.drivers.win32_driver import Win32Driver
@@ -41,12 +37,17 @@ from tax_rpa.pages.comprehensive_income.elements.tax_calculation import (
     CONTINUE_TAX_CALCULATION_BUTTON,
     TAX_CALCULATION_TAB,
 )
+from tax_rpa.pages.shared.components.content_text import ContentTextComponent
+from tax_rpa.pages.shared.components.file_dialog import FileDialogComponent
+from tax_rpa.pages.shared.components.left_nav import LeftNavComponent
+from tax_rpa.pages.shared.components.toolbar import ToolbarComponent
 from tax_rpa.pages.shared.dialogs import PageDialogMixin
 from tax_rpa.runtime.context import RpaContext
 from tax_rpa.runtime.result import StepResult
 
 
 class ComprehensiveIncomePage(PageDialogMixin):
+    """综合所得申报页面对象，封装工资薪金导入、预填、计算、报送和导出动作。"""
     def __init__(
         self,
         context: RpaContext | None,
@@ -58,6 +59,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         salary_import_result_reader: Any | None = None,
         win32: Win32Driver | None = None,
     ) -> None:
+        """初始化综合所得收入页面实例，保存依赖、配置和运行上下文。"""
         self.context = context
         self.hwnd = hwnd
         self.toolbar = toolbar
@@ -70,6 +72,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         self.win32 = win32 or Win32Driver()
 
     def inspect(self) -> dict[str, Any]:
+        """采集当前页面的窗口、文本和关键控件信息，用于调试和诊断。"""
         if self.context is None:
             return {"ready": False}
 
@@ -110,9 +113,11 @@ class ComprehensiveIncomePage(PageDialogMixin):
         }
 
     def is_ready(self) -> bool:
+        """判断当前页面是否已经打开并具备继续操作的关键标识。"""
         return bool(self.inspect()["ready"])
 
     def open(self) -> StepResult:
+        """打开当前页面并等待页面关键标识出现。"""
         if self.context is None:
             return StepResult(
                 ok=True,
@@ -144,6 +149,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def step(self, name: str, **data: Any):
+        """创建页面局部步骤上下文，用于记录日志和截图。"""
         logger = self.context.logger if self.context is not None else None
         step = getattr(logger, "step", None)
         if callable(step):
@@ -151,25 +157,31 @@ class ComprehensiveIncomePage(PageDialogMixin):
         return nullcontext()
 
     def is_dry_run(self) -> bool:
+        """判断是否满足dryrun条件。"""
         if self.context is None:
             return False
         return bool(self.context.config.dry_run)
 
     def click_salary_income_row(self) -> StepResult:
+        """点击综合所得页面中的工资薪金所得行。"""
         return self._content_text().click_text(SALARY_INCOME_ROW.text)
 
     def click_salary_income_fill(self) -> StepResult:
+        """点击工资薪金所得的填写入口。"""
         return self._content_text().click_text(FILL_BUTTON.text)
 
     def click_import_button(self) -> StepResult:
+        """点击当前页面的导入按钮，打开导入菜单或文件选择流程。"""
         if self.toolbar is not None:
             return self.toolbar.click_button(IMPORT_BUTTON.text)
         return self.default_toolbar().click_button(IMPORT_BUTTON.text)
 
     def choose_import_data_option(self) -> StepResult:
+        """从工资薪金导入菜单中选择导入数据选项。"""
         return self._content_text().click_text(IMPORT_DATA_OPTION.text)
 
     def choose_salary_income_file(self, path: Path, import_option_result: StepResult) -> StepResult | None:
+        """在文件选择框中选择工资薪金 Excel 文件。"""
         dialog = import_option_result.evidence.get("dialog")
         if self.file_dialog is not None:
             return self.file_dialog.choose_file(path)
@@ -186,6 +198,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         ).choose_file(path)
 
     def read_salary_income_import_result(self) -> StepResult:
+        """读取工资薪金导入结果并返回分类后的步骤结果。"""
         if self.salary_import_result_reader is not None:
             return self.salary_import_result_reader()
         if self.context is None or self.context.main_window is None:
@@ -199,9 +212,11 @@ class ComprehensiveIncomePage(PageDialogMixin):
         ).read_result()
 
     def click_prefill_deduction(self) -> StepResult:
+        """点击预填专项附加扣除入口。"""
         return self._content_text().click_text(PREFILL_DEDUCTION_BUTTON.text)
 
     def read_prefill_confirmation_dialog(self) -> StepResult:
+        """读取预填前确认弹窗内容。"""
         return StepResult(
             ok=False,
             name="prefill.confirmation_dialog",
@@ -216,6 +231,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         *,
         allow_skip_personal_pension: bool,
     ) -> StepResult:
+        """确认预填选项，并按配置处理个人养老金跳过策略。"""
         content = self._content_text()
         auto_confirm = content.click_text(AUTO_PREFILL_CONFIRM_CHECKBOX.text)
         special_deduction = content.click_text(SPECIAL_DEDUCTION_CHECKBOX.text)
@@ -257,6 +273,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def read_prefill_result(self) -> StepResult:
+        """读取预填执行结果并转换为步骤结果。"""
         return StepResult(
             ok=False,
             name="prefill.result",
@@ -267,9 +284,11 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def click_tax_calculation_tab(self) -> StepResult:
+        """打开税款计算页签。"""
         return self._content_text().click_text(TAX_CALCULATION_TAB.text)
 
     def read_tax_calculation_popup(self) -> StepResult:
+        """读取税款计算前的确认或风险提示弹窗。"""
         return StepResult(
             ok=True,
             name="tax_calculation.popup",
@@ -277,9 +296,11 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def confirm_tax_calculation_popup(self) -> StepResult:
+        """确认允许继续的税款计算弹窗。"""
         return self._content_text().click_text(CONTINUE_TAX_CALCULATION_BUTTON.text)
 
     def read_tax_calculation_result(self) -> StepResult:
+        """读取税款计算结果并转换为步骤结果。"""
         return StepResult(
             ok=False,
             name="tax_calculation.result",
@@ -290,9 +311,11 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def open_declaration_submission_page(self) -> StepResult:
+        """打开申报表报送页面。"""
         return self._content_text().click_text(DECLARATION_SUBMISSION_TAB.text)
 
     def locate_send_declaration_button(self) -> StepResult:
+        """定位发送申报按钮，用于检查报送就绪状态。"""
         return StepResult(
             ok=False,
             name="declaration_submission.send_button",
@@ -303,12 +326,15 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def open_export_report_menu(self) -> StepResult:
+        """打开导出申报表菜单。"""
         return self._content_text().click_text(EXPORT_DECLARATION_REPORT_BUTTON.text)
 
     def choose_standard_report_option(self) -> StepResult:
+        """选择标准申报表导出选项。"""
         return self._content_text().click_text(STANDARD_REPORT_OPTION.text)
 
     def read_export_result(self, *, run_mode: str) -> StepResult:
+        """读取导出结果，并根据运行模式判断是否可接受。"""
         return StepResult(
             ok=False,
             name="export_report.result",
@@ -320,6 +346,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def default_toolbar(self) -> ToolbarComponent:
+        """创建当前页面默认工具栏组件。"""
         if self.context is None:
             raise RuntimeError("Default toolbar requires RpaContext")
         return ToolbarComponent(
@@ -331,6 +358,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def default_content_text(self) -> ContentTextComponent:
+        """创建当前页面默认内容文本组件。"""
         if self.context is None:
             raise RuntimeError("Default content text requires RpaContext")
         return ContentTextComponent(
@@ -342,11 +370,13 @@ class ComprehensiveIncomePage(PageDialogMixin):
         )
 
     def _content_text(self) -> Any:
+        """构建当前页面内部使用的内容文本组件。"""
         if self.content_text is not None:
             return self.content_text
         return self.default_content_text()
 
     def _content_rect(self) -> list[int]:
+        """计算当前页面内容区域边界，供 OCR 点击限制范围。"""
         rect = self.win32.get_rect(self.hwnd)
         children = self.win32.collect_children(self.hwnd)
         nav_rect, _ = self.region.detect_left_nav_rect(rect, children)
@@ -354,6 +384,7 @@ class ComprehensiveIncomePage(PageDialogMixin):
         return content_rect
 
     def _find_file_dialog(self) -> dict[str, Any] | None:
+        """执行页面、综合所得收入、页面中的内部辅助逻辑：find文件弹窗。"""
         if self.context is None or self.context.main_window is None:
             return None
         allowed_pids = {int(self.context.main_window["pid"])}

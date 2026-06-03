@@ -4,6 +4,7 @@ from typing import Any
 
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.runtime.result import WorkflowResult
+from tax_rpa.runtime.workflow_options import WorkflowRuntimeOptions
 from tax_rpa.workflows.app_lifecycle_workflow import AppLifecycleWorkflow
 from tax_rpa.workflows.recovery_policy import can_retry_after_failure
 
@@ -12,6 +13,7 @@ BusinessWorkflowFactory = Callable[..., Any]
 
 
 class CombinedTaxWorkflow:
+    """组合税务工作流工作流，负责编排该业务链路的页面步骤和失败结果。"""
     def __init__(
         self,
         config: PersonImportConfig,
@@ -20,17 +22,23 @@ class CombinedTaxWorkflow:
         reset: bool = False,
         app_factory: Callable[[PersonImportConfig, Any], Any] | None = None,
         name: str = "combined_tax_workflow",
-        job_context: Any | None = None,
+        runtime_options: WorkflowRuntimeOptions | None = None,
+        step_runner: Any | None = None,
+        action_policy: Any | None = None,
     ) -> None:
+        """初始化组合税务工作流实例，保存依赖、配置和运行上下文。"""
         self.config = config
         self.logger = logger
         self.workflow_factories = workflow_factories
         self.reset = reset
         self.app_factory = app_factory
         self.name = name
-        self.job_context = job_context
+        self.runtime_options = runtime_options or WorkflowRuntimeOptions.from_config(config)
+        self.step_runner = step_runner
+        self.action_policy = action_policy
 
     def run(self) -> WorkflowResult:
+        """执行当前步骤或工作流的主流程，并返回标准结果。"""
         lifecycle = AppLifecycleWorkflow(
             self.config,
             self.logger,
@@ -38,7 +46,7 @@ class CombinedTaxWorkflow:
             app_factory=self.app_factory,
         )
         lifecycle_result = lifecycle.run()
-        self._attach_job_context(lifecycle.app)
+        self._attach_action_policy(lifecycle.app)
         if not lifecycle_result.ok:
             return WorkflowResult(
                 ok=False,
@@ -61,7 +69,7 @@ class CombinedTaxWorkflow:
             if not result.ok and can_retry_after_failure(result):
                 recovered = self._reset_and_wait_for_login()
                 if recovered.ok:
-                    self._attach_job_context(recovered.evidence["app"])
+                    self._attach_action_policy(recovered.evidence["app"])
                     workflow = self._build_business_workflow(factory)
                     result = workflow.run_on_app(recovered.evidence["app"])
             business_results.append(result)
@@ -96,6 +104,7 @@ class CombinedTaxWorkflow:
         )
 
     def _reset_and_wait_for_login(self) -> WorkflowResult:
+        """执行工作流、组合税务工作流中的内部辅助逻辑：resetand等待for登录。"""
         lifecycle = AppLifecycleWorkflow(
             self.config,
             self.logger,
@@ -103,7 +112,7 @@ class CombinedTaxWorkflow:
             app_factory=self.app_factory,
         )
         result = lifecycle.run()
-        self._attach_job_context(lifecycle.app)
+        self._attach_action_policy(lifecycle.app)
         if not result.ok:
             return result
         return WorkflowResult(
@@ -115,30 +124,32 @@ class CombinedTaxWorkflow:
         )
 
     def _build_business_workflow(self, factory: BusinessWorkflowFactory) -> Any:
-        if self.job_context is None:
-            return factory(self.config, self.logger)
-        if _accepts_job_context(factory):
-            return factory(self.config, self.logger, self.job_context)
-        return factory(self.config, self.logger)
+        """执行工作流、组合税务工作流中的内部辅助逻辑：build业务工作流。"""
+        kwargs: dict[str, Any] = {}
+        if self.step_runner is not None and _accepts_parameter(factory, "step_runner"):
+            kwargs["step_runner"] = self.step_runner
+        if _accepts_parameter(factory, "runtime_options"):
+            kwargs["runtime_options"] = self.runtime_options
+        return factory(self.config, self.logger, **kwargs)
 
-    def _attach_job_context(self, app: Any) -> None:
-        if self.job_context is None:
+    def _attach_action_policy(self, app: Any) -> None:
+        """执行工作流、组合税务工作流中的内部辅助逻辑：attach动作策略。"""
+        if self.action_policy is None:
             return
         app_context = getattr(app, "context", None)
         if app_context is None:
             return
         if hasattr(app_context, "action_policy"):
-            app_context.action_policy = self.job_context.action_policy
+            app_context.action_policy = self.action_policy
 
 
-def _accepts_job_context(factory: BusinessWorkflowFactory) -> bool:
+def _accepts_parameter(factory: BusinessWorkflowFactory, name: str) -> bool:
+    """执行工作流、组合税务工作流中的内部辅助逻辑：accepts参数。"""
     try:
         signature = inspect.signature(factory)
     except (TypeError, ValueError):
         return False
-    parameters = list(signature.parameters.values())
-    if any(parameter.kind == inspect.Parameter.VAR_POSITIONAL for parameter in parameters):
+    parameters = signature.parameters
+    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()):
         return True
-    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters):
-        return True
-    return len(parameters) >= 3
+    return name in parameters
