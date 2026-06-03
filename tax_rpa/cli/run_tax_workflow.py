@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from tax_rpa.cli.execution_mode import with_execution_mode
-from tax_rpa.cli.from_zero_import_person_info import SelfCheckApp
+from tax_rpa.testing.self_check_app import SelfCheckApp
 from tax_rpa.config.person_import import PersonImportConfig, load_import_config
 from tax_rpa.drivers.logger import RunLogger
 from tax_rpa.workflows.combined_tax_workflow import CombinedTaxWorkflow

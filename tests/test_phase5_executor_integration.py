@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tax_rpa.cli.from_zero_import_person_info import (
+from tax_rpa.testing.self_check_app import (
     SelfCheckApp,
     SelfCheckComprehensiveIncomePage,
     SelfCheckShell,

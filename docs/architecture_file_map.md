@@ -144,7 +144,7 @@ Page/Step returns StepResult
 | `cleanup_artifacts.py` | 产物留存清理入口。 |
 | `debug_person_info_page.py` | 人员信息页面调试入口，直接组合 page steps。 |
 | `execution_mode.py` | CLI 执行模式辅助。 |
-| `from_zero_import_person_info.py` | 从启动客户端到人员导入的旧自检/入口能力。 |
+| `from_zero_import_person_info.py` | 从启动客户端到人员信息导入的旧单流程 CLI；self-check 假客户端已统一到 `tax_rpa/testing/self_check_app.py`。 |
 | `import_salary_income.py` | 薪资收入导入入口。 |
 | `run_tax_workflow.py` | 综合 workflow 入口和 self-check 入口。 |
 | `update_special_deduction.py` | 专项附加扣除更新入口。 |
@@ -273,6 +273,13 @@ Page/Step returns StepResult
 | `declaration_submission_workflow.py` | 申报发送前就绪检查业务顺序。 |
 | `export_report_workflow.py` | 申报表导出业务顺序。 |
 | `recovery_policy.py` | 组合 workflow 失败后是否可重启恢复的判断。 |
+
+### `tax_rpa/testing`
+
+| 文件 | 职责 |
+| --- | --- |
+| `__init__.py` | testing 包入口。 |
+| `self_check_app.py` | 统一 fake 客户端、fake shell 和 fake page 对象，供 CLI `--self-check`、Job fake-driver 测试和工作流编排测试复用。 |
 
 ### `tax_rpa/jobs`
 

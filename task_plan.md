@@ -392,6 +392,16 @@ Still out of scope after Phase 7:
 - [x] Run full unit suite.
 - **Status:** complete
 
+### Transitional File Cleanup 2026-06-03: Self-check and old-wrapper cleanup
+
+- [x] Scan current project for duplicated self-check classes, historical wrapper functions, and stale current-doc references.
+- [x] Move reusable fake app/shell/page objects to `tax_rpa/testing/self_check_app.py`.
+- [x] Remove duplicated `SelfCheck*` classes from CLI modules.
+- [x] Remove unused historical Win32 wrapper helpers from `from_zero_import_person_info.py`.
+- [x] Update CLI/tests/docs to use the unified self-check adapter.
+- [x] Run focused regression, compile check, full test suite, and CLI self-checks.
+- **Status:** complete
+
 ## Key Questions
 
 1. What is the smallest Phase 1 fake job contract that proves the job layer works without UI automation?

@@ -9,7 +9,7 @@ from typing import Any
 from tax_rpa.cli.execution_mode import with_execution_mode
 from tax_rpa.config.person_import import PersonImportConfig, load_import_config
 from tax_rpa.drivers.logger import RunLogger
-from tax_rpa.runtime.result import StepResult
+from tax_rpa.testing.self_check_app import SelfCheckApp
 from tax_rpa.workflows.combined_tax_workflow import CombinedTaxWorkflow
 from tax_rpa.workflows.import_salary_income_workflow import ImportSalaryIncomeWorkflow
 
@@ -72,84 +72,6 @@ def parse_args() -> argparse.Namespace:
         help="Do not relaunch this command as administrator when not elevated.",
     )
     return parser.parse_args()
-
-
-class SelfCheckApp:
-    """check客户端，封装cli、导入工资薪金收入相关状态和行为。"""
-    def __init__(self, _config: PersonImportConfig, _logger: Any) -> None:
-        """初始化check客户端实例，保存依赖、配置和运行上下文。"""
-        pass
-
-    def start_if_needed(self) -> StepResult:
-        """在客户端未运行时启动客户端，已运行时直接复用。"""
-        return StepResult(ok=True, name="self_check.start_if_needed", status="self_check_start")
-
-    def wait_for_login(self) -> StepResult:
-        """等待客户端完成登录；配置了自动登录时会尝试自动输入申报密码。"""
-        return StepResult(ok=True, name="self_check.wait_for_login", status="self_check_login")
-
-    def reset(self) -> StepResult:
-        """重置税务客户端进程，清理旧窗口后准备重新启动。"""
-        return StepResult(ok=True, name="self_check.reset", status="self_check_reset")
-
-    def shell(self):
-        """返回主界面门面对象，供工作流继续打开业务页面。"""
-        return SelfCheckShell()
-
-
-class SelfCheckShell:
-    """check主界面，封装cli、导入工资薪金收入相关状态和行为。"""
-    def open_comprehensive_income_page(self):
-        """打开综合所得收入页面，并返回后续流程需要的对象或结果。"""
-        return SelfCheckComprehensiveIncomePage()
-
-
-class SelfCheckComprehensiveIncomePage:
-    """check综合所得收入页面，封装cli、导入工资薪金收入相关状态和行为。"""
-    def step(self, _name: str, **_data: Any):
-        """创建页面局部步骤上下文，用于记录日志和截图。"""
-        from contextlib import nullcontext
-
-        return nullcontext()
-
-    def click_salary_income_row(self) -> StepResult:
-        """点击综合所得页面中的工资薪金所得行。"""
-        return StepResult(ok=True, name="self_check.click_salary_income_row", status="dry_run")
-
-    def click_salary_income_fill(self) -> StepResult:
-        """点击工资薪金所得的填写入口。"""
-        return StepResult(ok=True, name="self_check.click_salary_income_fill", status="dry_run")
-
-    def click_import_button(self) -> StepResult:
-        """点击当前页面的导入按钮，打开导入菜单或文件选择流程。"""
-        return StepResult(ok=True, name="self_check.click_import_button", status="dry_run")
-
-    def choose_import_data_option(self) -> StepResult:
-        """从工资薪金导入菜单中选择导入数据选项。"""
-        return StepResult(
-            ok=True,
-            name="self_check.choose_import_data_option",
-            status="dry_run",
-            evidence={"dialog": {"hwnd": 1}},
-        )
-
-    def choose_salary_income_file(self, path: Path, _import_option_result: StepResult) -> StepResult:
-        """在文件选择框中选择工资薪金 Excel 文件。"""
-        return StepResult(
-            ok=True,
-            name="self_check.choose_salary_income_file",
-            status="dry_run",
-            evidence={"file_path": str(path)},
-        )
-
-    def read_salary_income_import_result(self) -> StepResult:
-        """读取工资薪金导入结果并返回分类后的步骤结果。"""
-        return StepResult(
-            ok=True,
-            name="self_check.wait_salary_income_import_result",
-            status="success",
-        )
-
 
 def run_workflow(
     config: PersonImportConfig,

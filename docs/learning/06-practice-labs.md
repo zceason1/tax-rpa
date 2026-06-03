@@ -60,7 +60,7 @@
 
 - `tax_rpa/pages/person_info/steps/wait_import_result.py`
 - `tax_rpa/pages/comprehensive_income/steps/import_salary_income_data.py`
-- `tax_rpa/jobs/action_policy.py`
+- `tax_rpa/runtime/action_policy.py`
 
 完成标准：
 

@@ -16,6 +16,7 @@
 - `tax_rpa/cli/from_zero_import_person_info.py`
 - `tax_rpa/config/person_import.py`
 - `tax_rpa/runtime/result.py`
+- `tax_rpa/testing/self_check_app.py`
 
 完成标准：
 
@@ -98,7 +99,7 @@
 - `tax_rpa/jobs/manifest.py`
 - `tax_rpa/jobs/runner.py`
 - `tax_rpa/jobs/existing_workflow_executor.py`
-- `tax_rpa/jobs/action_policy.py`
+- `tax_rpa/runtime/action_policy.py`
 - `tax_rpa/jobs/observability.py`
 - `tax_rpa/jobs/production_gate.py`
 

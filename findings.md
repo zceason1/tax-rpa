@@ -82,7 +82,7 @@
 - Phase 7 added `CanaryRunner`; it writes `artifacts/canary/{timestamp}/canary_record.json`, never records submit clicks, and writes `maintenance_ticket.json` for missing page markers/buttons/popup patterns.
 - Phase 7 added `ProductionGate`; it denies submit until self-check, inspected canary, execute-no-send canary, calibration gate, tax-client version match, and checklist/canary review gates pass.
 - `SubmitAuthorization` can now consume an optional `ProductionGate`; when supplied, `production_gate` becomes a deny gate before a one-time submit permit is issued.
-- `ActionPolicy` now lives in `tax_rpa/runtime/action_policy.py`; `tax_rpa/jobs/action_policy.py` is a compatibility re-export for job-layer callers.
+- `ActionPolicy` now lives in `tax_rpa/runtime/action_policy.py`; `tax_rpa/jobs/action_policy.py` has been removed and should not be used as a compatibility import.
 - Workflow step instrumentation now lives in `tax_rpa/jobs/workflow_step_runner.py` as `JobStepRunner`; `tax_rpa/workflows/job_context.py` has been removed.
 - Workflows receive `step_runner`, `runtime_options`, and explicit `action_policy` instead of reading job-specific context.
 - `WorkflowRuntimeOptions` carries manifest-derived business flags such as `run_mode` and `allow_skip_personal_pension`.
@@ -130,6 +130,7 @@
 | Treat `Job` as a production runtime shell, not a page automation layer | Jobs adapt manifests, artifacts, callbacks, and observability to workflows; workflows must not import concrete job modules. |
 | Keep Page objects below Steps | Pages expose capabilities; workflows and debug tooling compose steps for business order. |
 | Keep shared UI components under `pages/shared/components` | This removes the confusing split between page-local components and the old top-level shared component package, which has now been deleted. |
+| Keep self-check doubles outside CLI modules | CLI files should parse arguments and invoke workflows. Fake clients/pages now live in `tax_rpa/testing/self_check_app.py`, so self-check behavior is reusable and not scattered across entry files. |
 
 ## Issues Encountered
 

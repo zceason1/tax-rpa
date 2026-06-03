@@ -3,9 +3,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tax_rpa.config.person_import import PersonImportConfig
+from tax_rpa.app.tax_client_app import build_launch_decision
 from tax_rpa.cli.from_zero_import_person_info import (
-    build_launch_decision,
-    is_process_not_found,
     parse_args,
     run_from_zero,
     run_self_check,
@@ -30,10 +29,6 @@ class FromZeroImportPersonInfoTests(unittest.TestCase):
         decision = build_launch_decision([], None)
 
         self.assertEqual(decision["action"], "missing_app_path")
-
-    def test_is_process_not_found_matches_existing_helper_error(self):
-        self.assertTrue(is_process_not_found(RuntimeError("未找到进程 EPPortalITS.exe")))
-        self.assertFalse(is_process_not_found(RuntimeError("other failure")))
 
     def test_run_self_check_executes_workflow_without_real_client(self):
         config = PersonImportConfig(person_info_file=Path("persons.xlsx"), dry_run=True)

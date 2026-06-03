@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tax_rpa.cli.from_zero_import_person_info import SelfCheckApp
+from tax_rpa.testing.self_check_app import SelfCheckApp
 from tax_rpa.jobs.existing_workflow_executor import ExistingWorkflowExecutor
 from tax_rpa.jobs.runner import JobRunner
 from tax_rpa.runtime.result import StepResult

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from tax_rpa.cli.from_zero_import_person_info import SelfCheckApp
+from tax_rpa.testing.self_check_app import SelfCheckApp
 from tax_rpa.config.person_import import ImportFileConfig, PersonImportConfig
 from tax_rpa.runtime.action_policy import ActionAuditLogger, ActionPolicy
 from tax_rpa.jobs.artifact_store import ArtifactStore

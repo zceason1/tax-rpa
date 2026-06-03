@@ -21,6 +21,7 @@ CLI / Job
 | `tax_rpa/config` | 配置模型、路径校验和静态安全校验。 |
 | `tax_rpa/runtime` | 运行时上下文、结果模型、`ActionPolicy`、`ActionGuard`、`StepRunner`、`WorkflowRuntimeOptions`、结果矩阵、共享文本/对话框目标。 |
 | `tax_rpa/app` | 税务客户端生命周期、登录能力和主界面入口。 |
+| `tax_rpa/testing` | self-check 和 fake-driver 测试使用的假客户端、假页面对象。 |
 | `tax_rpa/drivers` | Win32、OCR、UIA、鼠标、区域推断、等待、日志等底层能力。 |
 | `tax_rpa/pages/shared/components` | 跨页面复用 UI 组件，例如 toolbar、file dialog、left nav、message dialog。 |
 | `tax_rpa/pages/<page>` | 页面对象、页面元素、页面专属组件和业务步骤。 |

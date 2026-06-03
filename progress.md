@@ -843,3 +843,22 @@
 - Tests:
   - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v`
   - 228 tests passed.
+
+## Transitional File Cleanup - 2026-06-03
+
+- Audited CLI, self-check, runtime, docs, and tests for transitional/duplicated files after the architecture cleanup.
+- Consolidated fake self-check implementations:
+  - Added `tax_rpa/testing/self_check_app.py`.
+  - Added `tax_rpa/testing/__init__.py`.
+  - Removed duplicated `SelfCheckApp`, `SelfCheckShell`, and fake page classes from:
+    - `tax_rpa/cli/from_zero_import_person_info.py`
+    - `tax_rpa/cli/import_salary_income.py`
+    - `tax_rpa/cli/update_special_deduction.py`
+  - Updated `run_tax_workflow.py` and tests to import self-check doubles from `tax_rpa.testing.self_check_app`.
+- Removed unused historical wrapper functions from `from_zero_import_person_info.py`; client lifecycle helpers now stay in `TaxClientApp`/`Win32Driver`.
+- Updated current architecture/learning docs to include `tax_rpa/testing` and to point current safety-policy references at `tax_rpa/runtime/action_policy.py`.
+- Verification:
+  - Focused self-check/CLI/job regression: 22 tests passed.
+  - Python compile check: `.\.venv\Scripts\python.exe -m compileall -q tax_rpa tests` passed.
+  - Full regression: `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed with 227 tests.
+  - CLI self-check commands passed for `from_zero_import_person_info`, `run_tax_workflow`, `import_salary_income`, and `update_special_deduction`.
