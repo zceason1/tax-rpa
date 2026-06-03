@@ -1,2 +1,2 @@
-FILE_DIALOG_TITLE_HINTS = ("\u6253\u5f00", "\u9009\u62e9", "\u5bfc\u5165", "Open")
-OPEN_BUTTON_TEXTS = ("\u6253\u5f00", "\u786e\u5b9a", "Open")
+FILE_DIALOG_TITLE_HINTS = ("打开", "选择", "导入", "Open")
+OPEN_BUTTON_TEXTS = ("打开", "确定", "Open")

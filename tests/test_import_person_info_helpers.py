@@ -8,25 +8,25 @@ from tax_rpa.pages.shared.components.left_nav import should_try_home_card_fallba
 from tax_rpa.pages.shared.components.message_dialog import is_blocking_dialog
 
 
-IMPORT_TEXT = "\u5bfc\u5165"
-IMPORT_FILE_TEXT = "\u5bfc\u5165\u6587\u4ef6"
-STANDARD_TEMPLATE_IMPORT_TEXT = "\u6807\u51c6\u6a21\u677f\u5bfc\u5165"
-PERSON_INFO_PAGE_TEXT = "\u4eba\u5458\u4fe1\u606f\u91c7\u96c6"
-SUCCESS_TEXT = "\u5bfc\u5165\u6210\u529f"
-FAILURE_TEXT = "\u5bfc\u5165\u5931\u8d25"
-EMPTY_ID_TEXT = "\u8eab\u4efd\u8bc1\u53f7\u7801\u4e0d\u80fd\u4e3a\u7a7a"
-UNKNOWN_PROMPT_TEXT = "\u8bf7\u9009\u62e9\u8981\u5bfc\u5165\u7684\u6587\u4ef6"
-CORRECT_INFO_TEXT = "\u4fe1\u606f\u6b63\u786e(1)"
-SUBMIT_DATA_TEXT = "\u63d0\u4ea4\u6570\u636e"
-ALL_SUBMITTED_SUCCESS_TEXT = "\u4fe1\u606f\u5df2\u5168\u90e8\u63d0\u4ea4\u6210\u529f"
+IMPORT_TEXT = "导入"
+IMPORT_FILE_TEXT = "导入文件"
+STANDARD_TEMPLATE_IMPORT_TEXT = "标准模板导入"
+PERSON_INFO_PAGE_TEXT = "人员信息采集"
+SUCCESS_TEXT = "导入成功"
+FAILURE_TEXT = "导入失败"
+EMPTY_ID_TEXT = "身份证号码不能为空"
+UNKNOWN_PROMPT_TEXT = "请选择要导入的文件"
+CORRECT_INFO_TEXT = "信息正确(1)"
+SUBMIT_DATA_TEXT = "提交数据"
+ALL_SUBMITTED_SUCCESS_TEXT = "信息已全部提交成功"
 ERROR_GUIDANCE_TEXT = (
-    "\u9519\u8bef\u6570\u636e\u60a8\u53ef\u76f4\u63a5\u5728\u672c\u5730\u539f\u6587\u4ef6"
-    "\u4fee\u6539\u540e\uff0c\u70b9\u51fb\u3010\u91cd\u65b0\u6821\u9a8c\u672c\u5730\u6587\u4ef6\u3011\u3002"
+    "错误数据您可直接在本地原文件"
+    "修改后，点击【重新校验本地文件】。"
 )
-COMPLETE_TEXT = "\u5b8c\u6210"
-MAIN_WINDOW_TITLE = "\u81ea\u7136\u4eba\u7535\u5b50\u7a0e\u52a1\u5c40\uff08\u6263\u7f34\u7aef\uff09"
-CANCEL_TEXT = "\u53d6\u6d88"
-OPEN_TEXT = "\u6253\u5f00"
+COMPLETE_TEXT = "完成"
+MAIN_WINDOW_TITLE = "自然人电子税务局（扣缴端）"
+CANCEL_TEXT = "取消"
+OPEN_TEXT = "打开"
 
 
 class ImportPersonInfoHelperTests(unittest.TestCase):
@@ -57,7 +57,7 @@ class ImportPersonInfoHelperTests(unittest.TestCase):
                 "box": [[10, 10], [130, 10], [130, 35], [10, 35]],
             },
             {
-                "text": "\u606f\u91c7\u96c6",
+                "text": "息采集",
                 "score": 0.999,
                 "box": [[220, 80], [280, 80], [280, 105], [220, 105]],
             },
@@ -95,12 +95,12 @@ class ImportPersonInfoHelperTests(unittest.TestCase):
         self.assertIsNone(match)
 
     def test_classify_import_result_success(self):
-        result = classify_import_result([SUCCESS_TEXT, "\u5171\u5bfc\u5165 3 \u6761\u4eba\u5458\u4fe1\u606f"])
+        result = classify_import_result([SUCCESS_TEXT, "共导入 3 条人员信息"])
 
         self.assertEqual(result, "success")
 
     def test_classify_import_result_all_submitted_success(self):
-        result = classify_import_result([ALL_SUBMITTED_SUCCESS_TEXT, "\u786e\u5b9a"])
+        result = classify_import_result([ALL_SUBMITTED_SUCCESS_TEXT, "确定"])
 
         self.assertEqual(result, "success")
 

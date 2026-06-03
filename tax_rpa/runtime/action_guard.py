@@ -6,16 +6,16 @@ class UnsafeActionError(ValueError):
 
 
 ALLOWED_ACTION_LABELS = {
-    "\u7533\u62a5\u5bc6\u7801\u767b\u5f55",
-    "\u7efc\u5408\u6240\u5f97\u7533\u62a5",
+    "申报密码登录",
+    "综合所得申报",
 }
 FORBIDDEN_ACTION_KEYWORDS = (
-    "\u62a5\u9001",
-    "\u53d1\u9001\u7533\u62a5",
-    "\u7533\u62a5",
-    "\u7f34\u6b3e",
-    "\u7f34\u7eb3",
-    "\u7a0e\u6b3e\u7f34\u7eb3",
+    "报送",
+    "发送申报",
+    "申报",
+    "缴款",
+    "缴纳",
+    "税款缴纳",
 )
 
 

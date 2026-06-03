@@ -8,7 +8,7 @@ from tax_rpa.runtime.action_guard import assert_safe_action
 from tax_rpa.runtime.action_policy import ActionPolicy
 from tax_rpa.runtime.result import StepResult
 
-CANCEL_BUTTON_TEXTS = ("\u53d6\u6d88", "\u5173\u95ed", "Cancel")
+CANCEL_BUTTON_TEXTS = ("取消", "关闭", "Cancel")
 
 
 class FileDialogComponent:

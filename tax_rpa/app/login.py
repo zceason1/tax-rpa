@@ -6,8 +6,8 @@ from tax_rpa.drivers.uia_driver import UiaDriver
 from tax_rpa.runtime.result import StepResult
 
 
-DECLARATION_PASSWORD_LOGIN_TEXT = "\u7533\u62a5\u5bc6\u7801\u767b\u5f55"
-PASSWORD_PLACEHOLDER_TEXT = "\u8bf7\u8f93\u5165\u5bc6\u7801"
+DECLARATION_PASSWORD_LOGIN_TEXT = "申报密码登录"
+PASSWORD_PLACEHOLDER_TEXT = "请输入密码"
 
 
 class PyAutoGuiKeyboard:

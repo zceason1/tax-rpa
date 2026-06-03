@@ -14,5 +14,5 @@ class SubmitImportDataStep:
 
     def run(self) -> StepResult:
         """执行当前步骤或工作流的主流程，并返回标准结果。"""
-        with self.page.step("\u63d0\u4ea4\u4eba\u5458\u4fe1\u606f\u6570\u636e"):
+        with self.page.step("提交人员信息数据"):
             return self.page.click_submit_data()

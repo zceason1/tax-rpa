@@ -134,8 +134,8 @@ class DriverBoundaryTests(unittest.TestCase):
             def collect_children(self, hwnd):
                 calls.append(("collect_children", hwnd))
                 return [
-                    {"class": "Button", "title": "\u53d6\u6d88", "visible": True, "rect": [10, 20, 90, 50]},
-                    {"class": "Button", "title": "\u6253\u5f00", "visible": True, "rect": [100, 20, 180, 50]},
+                    {"class": "Button", "title": "取消", "visible": True, "rect": [10, 20, 90, 50]},
+                    {"class": "Button", "title": "打开", "visible": True, "rect": [100, 20, 180, 50]},
                 ]
 
             def find_largest_edit_control(self, dialog_hwnd):
