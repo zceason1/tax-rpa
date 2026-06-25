@@ -3,24 +3,33 @@ import time
 from ctypes import wintypes
 
 
-mouse_user32 = ctypes.WinDLL("user32", use_last_error=True)
+def _missing_windows_api(*_args, **_kwargs):
+    raise RuntimeError("Windows mouse APIs are unavailable on this platform")
 
-MouseSetCursorPos = mouse_user32.SetCursorPos
-MouseGetCursorPos = mouse_user32.GetCursorPos
-MouseEvent = mouse_user32.mouse_event
-GetSystemMetrics = mouse_user32.GetSystemMetrics
+if hasattr(ctypes, "WinDLL"):
+    mouse_user32 = ctypes.WinDLL("user32", use_last_error=True)
 
-MouseSetCursorPos.argtypes = [ctypes.c_int, ctypes.c_int]
-MouseSetCursorPos.restype = wintypes.BOOL
-GetSystemMetrics.argtypes = [ctypes.c_int]
-GetSystemMetrics.restype = ctypes.c_int
-MouseEvent.argtypes = [
-    wintypes.DWORD,
-    wintypes.DWORD,
-    wintypes.DWORD,
-    wintypes.DWORD,
-    ctypes.c_void_p,
-]
+    MouseSetCursorPos = mouse_user32.SetCursorPos
+    MouseGetCursorPos = mouse_user32.GetCursorPos
+    MouseEvent = mouse_user32.mouse_event
+    GetSystemMetrics = mouse_user32.GetSystemMetrics
+
+    MouseSetCursorPos.argtypes = [ctypes.c_int, ctypes.c_int]
+    MouseSetCursorPos.restype = wintypes.BOOL
+    GetSystemMetrics.argtypes = [ctypes.c_int]
+    GetSystemMetrics.restype = ctypes.c_int
+    MouseEvent.argtypes = [
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+    ]
+else:
+    MouseSetCursorPos = _missing_windows_api
+    MouseGetCursorPos = _missing_windows_api
+    MouseEvent = _missing_windows_api
+    GetSystemMetrics = _missing_windows_api
 
 SM_CXSCREEN = 0
 SM_CYSCREEN = 1

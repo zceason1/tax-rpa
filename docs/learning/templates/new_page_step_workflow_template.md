@@ -87,15 +87,17 @@ class NewActionStep:
 ## workflow
 
 ```python
-from collections.abc import Callable
 from typing import Any
 
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.runtime.result import StepResult, WorkflowResult
 from tax_rpa.runtime.workflow_options import WorkflowRuntimeOptions
+from tax_rpa.workflows.base import BusinessWorkflow
 
 
-class NewWorkflow:
+class NewWorkflow(BusinessWorkflow):
+    name = "new_workflow"
+
     def __init__(
         self,
         config: PersonImportConfig,
@@ -104,50 +106,28 @@ class NewWorkflow:
         step_runner: Any | None = None,
         runtime_options: WorkflowRuntimeOptions | None = None,
     ) -> None:
-        self.config = config
-        self.logger = logger
-        self.step_runner = step_runner
-        self.runtime_options = runtime_options or WorkflowRuntimeOptions.from_config(config)
+        self._init_workflow(
+            config=config,
+            logger=logger,
+            runtime_options=runtime_options,
+            step_runner=step_runner,
+        )
 
-    def run_on_app(self, app: Any) -> WorkflowResult:
+    def execute(self, app: Any) -> WorkflowResult:
         steps: list[StepResult] = []
 
         page = app.shell().open_new_page()
-        action_result = self._run_step(
+        action_result = self.context.step(
             "new_page.new_action",
             lambda: NewActionStep(page).run(),
             side_effect_step=True,
         )
         steps.append(action_result)
 
-        return WorkflowResult(
-            ok=action_result.ok,
-            name="new_workflow",
-            status=action_result.status,
+        return self.context.result_from_step(
+            action_result,
             steps=steps,
             evidence={"action_result": action_result.evidence},
-            error=action_result.error,
-            error_type=action_result.error_type,
-            error_code=action_result.error_code,
-            side_effect_started=action_result.side_effect_started,
-            side_effect_committed=action_result.side_effect_committed,
-            retry_allowed=action_result.retry_allowed,
-        )
-
-    def _run_step(
-        self,
-        step: str,
-        operation: Callable[[], StepResult],
-        *,
-        side_effect_step: bool = False,
-    ) -> StepResult:
-        if self.step_runner is None:
-            return operation()
-        return self.step_runner.run_step(
-            workflow="new_workflow",
-            step=step,
-            operation=operation,
-            side_effect_step=side_effect_step,
         )
 ```
 

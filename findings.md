@@ -12,6 +12,22 @@
 ## Research Findings
 
 - `docs/superpowers/specs/2026-05-24-unattended-tax-rpa-design.md` defines the full target architecture and phase roadmap.
+- 2026-06-23 workflow-layer review found that business-layer complexity is concentrated in `tax_rpa/workflows`, not in the `Step -> Page -> Component -> Driver` boundary.
+- Every concrete workflow repeats lifecycle wrapping, constructor fields, `_run_step`, and `WorkflowResult` wrapping; these should be centralized before adding more business workflows.
+- `CombinedTaxWorkflow` currently uses factory signature introspection to pass `step_runner` and `runtime_options`, which is a symptom of inconsistent workflow constructor contracts.
+- `PersonImportConfig` is broader than its name, but renaming it should be handled separately from workflow simplification to avoid unnecessary compatibility churn.
+- Workflow simplification risk review identified four production-sensitive contracts to protect: full `WorkflowResult` metadata, side-effect/retry semantics, `JobStepRunner` observability, and single-owned app lifecycle in `CombinedTaxWorkflow`.
+- `ImportPersonInfoWorkflow` needs explicit protection for the post-submit `ready_to_submit -> UNKNOWN_RESULT/person_import_result_unknown` branch.
+- Independent subagent review found the original workflow simplification plan was not safe to execute as-is because it missed personnel submit-failure side-effect overrides and production CLI workflow factory updates before removing `CombinedTaxWorkflow` introspection.
+- Workflow simplification V2 plan created on 2026-06-24 consolidates the prior plan and discussion into a clearer sequence, adds an explicit macOS-vs-Windows validation boundary, and treats Windows validation as a release gate rather than a unit-test substitute.
+- Independent subagent review of workflow simplification V2 found that the plan must preserve each concrete workflow's current positional constructor ABI instead of imposing one optional-argument order across all workflows.
+- `WorkflowContext.step()` must be limited to operations returning `StepResult`; page-opening steps return Page objects and must remain direct calls unless a separate non-`StepRunner` helper is introduced.
+- Workflow result helpers must require explicit `steps` and `evidence`, and migrated workflows must preserve stable evidence keys such as personnel `import_file/validation_result/import_result/submit_result`, salary `open_form/import_file`, prefill `open_form/prefill`, and export `readiness/export/export_status`.
+- Job-path regression for workflow simplification must verify key result matrix rows for migrated business workflows, not only the final salary import row.
+- Final independent review of workflow simplification V2 found no High blocker, but required two plan clarifications before execution: `WorkflowContext.step()` must type-check the operation result before `JobStepRunner` touches it, and standalone lifecycle failure should intentionally preserve full `WorkflowResult`-compatible metadata and evidence.
+- Workflow simplification implementation now provides `BusinessWorkflow`, `WorkflowContext`, and a lazy workflow app factory; concrete workflows delegate shared lifecycle/result wrapping to the base while preserving business order and existing constructor positional ABI.
+- `CombinedTaxWorkflow` factory signature introspection has been removed after production CLI factories and test fake factories were updated to accept `step_runner` and `runtime_options`.
+- macOS semantic regression now passes with `/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 -m unittest discover -s tests -v` (236 tests); this still does not prove real Windows RPA execution.
 - `docs/superpowers/plans/2026-05-24-phase-0-completion.md` confirms Phase 0 completion and verification.
 - `docs/superpowers/reports/2026-05-24-current-development-status.md` now states that Phase 7 code support is complete and real deployment still needs target-machine calibration/canary artifacts.
 - Current package has no `tax_rpa/jobs/` module, so Phase 1 can be added without refactoring an existing job layer.
@@ -104,6 +120,14 @@
 
 | Decision | Rationale |
 |----------|-----------|
+| Simplify workflows with a small `BusinessWorkflow` and `WorkflowContext` layer | This reduces repeated business-layer plumbing without changing job, page, component, or driver boundaries. |
+| Migrate workflow simplification from simple workflows to personnel import last | Personnel import has special submit and side-effect semantics, so it carries the highest regression risk. |
+| Do not flatten Step/Page/Component/Driver as part of this cleanup | The RPA UI layers are verbose but purposeful; the readability issue is primarily workflow-level boilerplate. |
+| Preserve side-effect and retry fields explicitly during workflow result construction | The last failing step may be a wait/read step even though an earlier import or submit already changed external state. |
+| Avoid a declarative workflow DSL in this refactor | Ordinary Python control flow is easier to debug for RPA UI branches and safer for incremental migration. |
+| Update production CLI workflow factories before removing introspection | `CombinedTaxWorkflow` will pass `step_runner` and `runtime_options` unconditionally after the cleanup, so real CLI factories must accept `**kwargs`, not only test fakes. |
+| Preserve each concrete workflow constructor's current positional ABI during this refactor | Existing workflow constructors do not share one optional-argument order; the base class should expose a protected keyword-only initializer while concrete workflow `__init__` methods keep their existing signatures. |
+| Treat macOS regression as semantic verification only | macOS fake-driver tests can protect workflow/result semantics but cannot prove Win32/UIA/OCR behavior against the real tax client. |
 | Implement Phase 1 before additional UI workflows | The job layer controls manifest validation, artifacts, state, and locking, which later workflow phases depend on. |
 | Treat manifest, state, artifacts, and lock as stable contracts | These outputs will later feed callbacks, troubleshooting packages, and operational audits. |
 | Use deterministic unit tests and fake job tests | Phase 1 must not depend on the real tax client or Windows desktop state. |

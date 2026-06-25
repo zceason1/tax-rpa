@@ -65,9 +65,9 @@ class WorkflowCompositionTests(unittest.TestCase):
             logger=None,
             reset=True,
             workflow_factories=[
-                lambda config, logger: FakeBusinessWorkflow("person_info", events),
-                lambda config, logger: FakeBusinessWorkflow("special_deduction", events),
-                lambda config, logger: FakeBusinessWorkflow("salary_income", events),
+                lambda config, logger, **_kwargs: FakeBusinessWorkflow("person_info", events),
+                lambda config, logger, **_kwargs: FakeBusinessWorkflow("special_deduction", events),
+                lambda config, logger, **_kwargs: FakeBusinessWorkflow("salary_income", events),
             ],
             app_factory=lambda config, logger: FakeApp(events),
         )
@@ -100,7 +100,7 @@ class WorkflowCompositionTests(unittest.TestCase):
             config=config,
             logger=None,
             workflow_factories=[
-                lambda config, logger: FakeBusinessWorkflow("person_info", events),
+                lambda config, logger, **_kwargs: FakeBusinessWorkflow("person_info", events),
             ],
             app_factory=lambda config, logger: LoginFailureApp(events),
         )
@@ -126,8 +126,8 @@ class WorkflowCompositionTests(unittest.TestCase):
             logger=None,
             reset=False,
             workflow_factories=[
-                lambda config, logger: FakeBusinessWorkflow("person_info", events),
-                lambda config, logger: FakeBusinessWorkflow("special_deduction", events),
+                lambda config, logger, **_kwargs: FakeBusinessWorkflow("person_info", events),
+                lambda config, logger, **_kwargs: FakeBusinessWorkflow("special_deduction", events),
             ],
             app_factory=lambda config, logger: FakeApp(events),
         )
@@ -169,7 +169,7 @@ class WorkflowCompositionTests(unittest.TestCase):
             logger=None,
             reset=False,
             workflow_factories=[
-                lambda config, logger: RecoveringWorkflow(),
+                lambda config, logger, **_kwargs: RecoveringWorkflow(),
             ],
             app_factory=lambda config, logger: FakeApp(events),
         )
@@ -209,7 +209,7 @@ class WorkflowCompositionTests(unittest.TestCase):
             logger=None,
             reset=False,
             workflow_factories=[
-                lambda config, logger: FailingWorkflow(),
+                lambda config, logger, **_kwargs: FailingWorkflow(),
             ],
             app_factory=lambda config, logger: FakeApp(events),
         )
@@ -240,7 +240,7 @@ class WorkflowCompositionTests(unittest.TestCase):
         workflow = CombinedTaxWorkflow(
             config=PersonImportConfig(person_info_file=Path("persons.xlsx")),
             logger=None,
-            workflow_factories=[lambda config, logger: RetryAllowedWorkflow()],
+            workflow_factories=[lambda config, logger, **_kwargs: RetryAllowedWorkflow()],
             app_factory=lambda config, logger: FakeApp(events),
         )
 
@@ -276,7 +276,7 @@ class WorkflowCompositionTests(unittest.TestCase):
         workflow = CombinedTaxWorkflow(
             config=PersonImportConfig(person_info_file=Path("persons.xlsx")),
             logger=None,
-            workflow_factories=[lambda config, logger: RetryDisallowedWorkflow()],
+            workflow_factories=[lambda config, logger, **_kwargs: RetryDisallowedWorkflow()],
             app_factory=lambda config, logger: FakeApp(events),
         )
 
@@ -313,7 +313,7 @@ class WorkflowCompositionTests(unittest.TestCase):
         workflow = CombinedTaxWorkflow(
             config=PersonImportConfig(person_info_file=Path("persons.xlsx")),
             logger=None,
-            workflow_factories=[lambda config, logger: SideEffectWorkflow()],
+            workflow_factories=[lambda config, logger, **_kwargs: SideEffectWorkflow()],
             app_factory=lambda config, logger: FakeApp(events),
         )
 

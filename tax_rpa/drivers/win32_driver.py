@@ -2,63 +2,116 @@ import ctypes
 import subprocess
 import time
 from ctypes import wintypes
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
-import psutil
+try:
+    import psutil
+except ModuleNotFoundError:
+    class _MissingPsutil:
+        class Error(Exception):
+            pass
+
+        class NoSuchProcess(Error):
+            pass
+
+        class AccessDenied(Error):
+            def __init__(self, *_args, **_kwargs) -> None:
+                super().__init__("psutil is required for Win32 process operations")
+
+        class Process:
+            def __init__(self, *_args, **_kwargs) -> None:
+                raise RuntimeError("psutil is required for Win32 process operations")
+
+        def wait_procs(self, *_args, **_kwargs):
+            raise RuntimeError("psutil is required for Win32 process operations")
+
+        def pid_exists(self, *_args, **_kwargs):
+            raise RuntimeError("psutil is required for Win32 process operations")
+
+        def process_iter(self, *_args, **_kwargs):
+            raise RuntimeError("psutil is required for Win32 process operations")
+
+        def __getattr__(self, _name):
+            raise RuntimeError("psutil is required for Win32 process operations")
+
+    psutil = _MissingPsutil()
 
 from tax_rpa.runtime.dialog_targets import FILE_DIALOG_TITLE_HINTS
 from tax_rpa.runtime.text import normalize_text
 
 
-user32 = ctypes.windll.user32
-kernel32 = ctypes.windll.kernel32
-shell32 = ctypes.windll.shell32
+def _missing_windows_api(*_args, **_kwargs):
+    raise RuntimeError("Windows Win32 APIs are unavailable on this platform")
 
-try:
-    user32.SetProcessDPIAware()
-except Exception:
-    pass
+if hasattr(ctypes, "windll"):
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+    shell32 = ctypes.windll.shell32
 
-EnumWindows = user32.EnumWindows
-EnumChildWindows = user32.EnumChildWindows
-GetWindowThreadProcessId = user32.GetWindowThreadProcessId
-GetWindowTextLengthW = user32.GetWindowTextLengthW
-GetWindowTextW = user32.GetWindowTextW
-GetClassNameW = user32.GetClassNameW
-GetWindowRect = user32.GetWindowRect
-IsWindowVisible = user32.IsWindowVisible
-GetForegroundWindow = user32.GetForegroundWindow
-ShowWindow = user32.ShowWindow
-BringWindowToTop = user32.BringWindowToTop
-SetForegroundWindow = user32.SetForegroundWindow
-SetFocus = user32.SetFocus
-SetWindowPos = user32.SetWindowPos
-AttachThreadInput = user32.AttachThreadInput
-GetCurrentThreadId = kernel32.GetCurrentThreadId
-SendMessageW = user32.SendMessageW
-ShellExecuteW = shell32.ShellExecuteW
+    try:
+        user32.SetProcessDPIAware()
+    except Exception:
+        pass
 
-SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-ShellExecuteW.argtypes = [
-    wintypes.HWND,
-    wintypes.LPCWSTR,
-    wintypes.LPCWSTR,
-    wintypes.LPCWSTR,
-    wintypes.LPCWSTR,
-    ctypes.c_int,
-]
-ShellExecuteW.restype = ctypes.c_void_p
-SetWindowPos.argtypes = [
-    wintypes.HWND,
-    wintypes.HWND,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_int,
-    wintypes.UINT,
-]
-AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+    EnumWindows = user32.EnumWindows
+    EnumChildWindows = user32.EnumChildWindows
+    GetWindowThreadProcessId = user32.GetWindowThreadProcessId
+    GetWindowTextLengthW = user32.GetWindowTextLengthW
+    GetWindowTextW = user32.GetWindowTextW
+    GetClassNameW = user32.GetClassNameW
+    GetWindowRect = user32.GetWindowRect
+    IsWindowVisible = user32.IsWindowVisible
+    GetForegroundWindow = user32.GetForegroundWindow
+    ShowWindow = user32.ShowWindow
+    BringWindowToTop = user32.BringWindowToTop
+    SetForegroundWindow = user32.SetForegroundWindow
+    SetFocus = user32.SetFocus
+    SetWindowPos = user32.SetWindowPos
+    AttachThreadInput = user32.AttachThreadInput
+    GetCurrentThreadId = kernel32.GetCurrentThreadId
+    SendMessageW = user32.SendMessageW
+    ShellExecuteW = shell32.ShellExecuteW
+
+    SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    ShellExecuteW.argtypes = [
+        wintypes.HWND,
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        ctypes.c_int,
+    ]
+    ShellExecuteW.restype = ctypes.c_void_p
+    SetWindowPos.argtypes = [
+        wintypes.HWND,
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.UINT,
+    ]
+    AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+else:
+    EnumWindows = _missing_windows_api
+    EnumChildWindows = _missing_windows_api
+    GetWindowThreadProcessId = _missing_windows_api
+    GetWindowTextLengthW = _missing_windows_api
+    GetWindowTextW = _missing_windows_api
+    GetClassNameW = _missing_windows_api
+    GetWindowRect = _missing_windows_api
+    IsWindowVisible = _missing_windows_api
+    GetForegroundWindow = _missing_windows_api
+    ShowWindow = _missing_windows_api
+    BringWindowToTop = _missing_windows_api
+    SetForegroundWindow = _missing_windows_api
+    SetFocus = _missing_windows_api
+    SetWindowPos = _missing_windows_api
+    AttachThreadInput = _missing_windows_api
+    GetCurrentThreadId = _missing_windows_api
+    SendMessageW = _missing_windows_api
+    ShellExecuteW = _missing_windows_api
 
 SW_RESTORE = 9
 HWND_TOPMOST = wintypes.HWND(-1)
@@ -379,12 +432,14 @@ class Win32Driver:
         """通过配置的快捷方式或可执行文件启动税务客户端。"""
         logger.log("launch_client", "start", app_path=str(app_path))
         if app_path.suffix.lower() == ".lnk":
+            shortcut_path = str(PureWindowsPath(str(app_path)))
+            shortcut_dir = str(PureWindowsPath(str(app_path.parent)))
             result = ShellExecuteW(
                 None,
                 "open",
-                str(app_path),
+                shortcut_path,
                 None,
-                str(app_path.parent),
+                shortcut_dir,
                 1,
             )
             if result <= 32:

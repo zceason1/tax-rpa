@@ -1,6 +1,6 @@
 import time
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from tax_rpa.app.main_shell import MainShell
@@ -21,7 +21,7 @@ def build_launch_decision(pids: list[int], app_path: Path | None) -> dict[str, A
         return {"action": "reuse_running_process", "pids": pids}
     if app_path is None:
         return {"action": "missing_app_path"}
-    return {"action": "launch", "app_path": str(Path(app_path))}
+    return {"action": "launch", "app_path": str(PureWindowsPath(str(app_path)))}
 
 
 def choose_login_window(windows: list[dict[str, Any]]) -> dict[str, Any]:

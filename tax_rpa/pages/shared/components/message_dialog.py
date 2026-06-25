@@ -65,8 +65,6 @@ def close_blocking_dialogs(
         if dry_run:
             return closed
 
-        import pyautogui
-
         driver.set_foreground(dialog["hwnd"])
         if action == "confirm":
             button = driver.find_button_by_labels(
@@ -76,6 +74,8 @@ def close_blocking_dialogs(
             if button is not None:
                 mouse_driver.click(driver.rect_center(button["rect"]))
             else:
+                import pyautogui
+
                 pyautogui.press("enter")
         elif action == "cancel":
             button = driver.find_button_by_labels(
@@ -85,8 +85,12 @@ def close_blocking_dialogs(
             if button is not None:
                 mouse_driver.click(driver.rect_center(button["rect"]))
             else:
+                import pyautogui
+
                 pyautogui.press("esc")
         elif action == "escape":
+            import pyautogui
+
             pyautogui.press("esc")
         else:
             raise ValueError(f"Unsupported dialog action: {action}")

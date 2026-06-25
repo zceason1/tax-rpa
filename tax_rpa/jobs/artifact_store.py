@@ -74,7 +74,7 @@ class JobArtifacts:
             encoding="utf-8",
         )
         temp_path.replace(target)
-        return target.relative_to(self.root).as_posix()
+        return target.relative_to(self.root.resolve()).as_posix()
 
     def _resolve_job_relative_path(self, relative_path: str | Path) -> Path:
         """解析作业内相对路径，并阻止写出作业目录。"""

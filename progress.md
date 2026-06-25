@@ -1,5 +1,60 @@
 # Progress Log
 
+## Session: 2026-06-23
+
+### Business workflow simplification assessment
+
+- **Status:** plan drafted and risk-expanded
+- **Started:** 2026-06-23 Asia/Shanghai
+- Actions taken:
+  - Re-read existing planning files and current architecture file map.
+  - Reviewed workflow, runtime, job executor, page-step, and workflow-related tests.
+  - Confirmed the current architecture boundary should remain `CLI / Job -> Workflow -> Step -> Page -> Component -> Element / Driver`.
+  - Identified workflow-layer boilerplate as the main readability and maintainability issue.
+  - Drafted a phased refactor plan that introduces `WorkflowContext` and `BusinessWorkflow`, migrates workflows incrementally, then removes `CombinedTaxWorkflow` factory introspection.
+  - Expanded the plan with compatibility risks and validation steps for `WorkflowResult` metadata, side-effect/retry semantics, lifecycle duplication, `JobStepRunner` observability, and personnel import stalled-submit behavior.
+  - Spawned independent review agent Faraday to evaluate the plan.
+  - Incorporated Faraday's findings: personnel submit-failure must force side-effect/non-retry semantics, production CLI workflow factories must accept `**kwargs` before introspection removal, and `BusinessWorkflow` should remain positional-compatible during this refactor.
+  - Created V2 plan at `docs/superpowers/plans/2026-06-24-business-workflow-simplification-v2.md`, consolidating the prior plan with explicit macOS semantic regression and Windows validation gates.
+  - Spawned independent review agent Zeno for V2 and incorporated findings: preserve per-workflow constructor ABI, restrict `WorkflowContext.step()` to `StepResult` operations, preserve workflow-specific evidence keys, and require full factory search before removing `CombinedTaxWorkflow` introspection.
+  - Expanded V2 verification to include `tests.test_from_zero_import_person_info`, evidence shape regression, and key job result-matrix rows for every migrated business workflow.
+  - Spawned independent review agent Hegel for the revised V2 plan; it found no High blocker.
+  - Incorporated Hegel's Medium/Low findings by requiring pre-`JobStepRunner` type checking in `WorkflowContext.step()`, clarifying lifecycle failure metadata/evidence preservation, narrowing `StepResult` copy wording to `WorkflowResult`-compatible fields, and tightening Windows gate entrypoint wording.
+- Files created/modified:
+  - `docs/superpowers/plans/2026-06-23-business-workflow-simplification.md`
+  - `docs/superpowers/plans/2026-06-24-business-workflow-simplification-v2.md`
+  - `findings.md`
+  - `progress.md`
+- Verification:
+  - Planning and code review only; no implementation tests were run.
+
+### Business workflow simplification implementation
+
+- **Status:** implementation complete on macOS semantic tests
+- **Started:** 2026-06-24 Asia/Shanghai
+- Actions taken:
+  - Added `WorkflowContext` and `BusinessWorkflow` with focused tests for step-runner integration, non-`StepResult` rejection before `JobStepRunner` field access, result wrapping, lifecycle failure metadata, and constructor positional ABI.
+  - Migrated existing concrete workflows to inherit `BusinessWorkflow` while keeping each public constructor's current positional argument order.
+  - Kept page-opening steps as direct calls and routed only `StepResult`-returning business steps through `WorkflowContext.step()`.
+  - Preserved workflow-specific evidence keys for personnel, salary, prefill, and export workflows.
+  - Removed `CombinedTaxWorkflow` factory signature introspection after updating production CLI and test workflow factories to accept keyword context.
+  - Added lazy import guards around workflow exports, default app creation, CLI Windows admin helpers, page package exports, and Windows-only driver bindings so macOS fake-driver regression can import and run.
+  - Fixed macOS path normalization issues in `ArtifactStore`, tax client launch decisions, and `.lnk` launch tests without changing the intended Windows path contract.
+  - Updated architecture docs and the new workflow template to show `BusinessWorkflow`/`WorkflowContext`.
+- Files created/modified:
+  - `tax_rpa/workflows/base.py`
+  - `tax_rpa/workflows/context.py`
+  - `tax_rpa/workflows/app_factory.py`
+  - `tax_rpa/cli/windows_admin.py`
+  - `tests/test_workflow_context.py`
+  - concrete workflow modules under `tax_rpa/workflows/`
+  - workflow CLI entrypoints, docs, and supporting import/path compatibility files
+- Verification:
+  - `/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 -m unittest tests.test_workflow_context -v` passed.
+  - `/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 -m unittest tests.test_workflow_composition tests.test_existing_workflow_executor tests.test_phase5_executor_integration tests.test_job_runner tests.test_from_zero_import_person_info tests.test_workflow_context -v` passed.
+  - `/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11 -m unittest discover -s tests -v` passed: 236 tests.
+  - Windows self-check, inspect_only, and execute_no_send canary were not run in this macOS environment.
+
 ## Session: 2026-06-03
 
 ### Architecture boundary cleanup

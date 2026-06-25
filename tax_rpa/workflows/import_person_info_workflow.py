@@ -1,7 +1,5 @@
-from collections.abc import Callable
 from typing import Any
 
-from tax_rpa.app.tax_client_app import TaxClientApp
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.pages.person_info.steps.import_person_file import ImportPersonFileStep
 from tax_rpa.pages.person_info.steps.open_page import OpenPersonInfoPageStep
@@ -9,86 +7,50 @@ from tax_rpa.pages.person_info.steps.submit_import_data import SubmitImportDataS
 from tax_rpa.pages.person_info.steps.wait_import_result import WaitImportResultStep
 from tax_rpa.runtime.result import StepResult, WorkflowResult
 from tax_rpa.runtime.workflow_options import WorkflowRuntimeOptions
-from tax_rpa.workflows.app_lifecycle_workflow import AppLifecycleWorkflow
+from tax_rpa.workflows.base import BusinessWorkflow
 
 
-class ImportPersonInfoWorkflow:
+class ImportPersonInfoWorkflow(BusinessWorkflow):
     """导入人员信息工作流工作流，负责编排该业务链路的页面步骤和失败结果。"""
+    name = "import_person_info_workflow"
+
     def __init__(
         self,
         config: PersonImportConfig,
         logger: Any,
-        app_factory: Callable[[PersonImportConfig, Any], Any] | None = None,
+        app_factory: Any | None = None,
         runtime_options: WorkflowRuntimeOptions | None = None,
         step_runner: Any | None = None,
         reset: bool = False,
     ) -> None:
         """初始化导入人员信息工作流实例，保存依赖、配置和运行上下文。"""
-        self.config = config
-        self.logger = logger
-        self.app_factory = app_factory or (lambda config, logger: TaxClientApp(config, logger))
-        self.runtime_options = runtime_options or WorkflowRuntimeOptions.from_config(config)
-        self.step_runner = step_runner
-        self.reset = reset
-
-    def run(self) -> WorkflowResult:
-        """执行当前步骤或工作流的主流程，并返回标准结果。"""
-        lifecycle = AppLifecycleWorkflow(
-            self.config,
-            self.logger,
-            reset=self.reset,
-            app_factory=self.app_factory,
-        )
-        lifecycle_result = lifecycle.run()
-        if not lifecycle_result.ok:
-            return WorkflowResult(
-                ok=False,
-                name="import_person_info_workflow",
-                status=lifecycle_result.status,
-                steps=lifecycle_result.steps,
-                error=lifecycle_result.error,
-            )
-        business_result = self.run_on_app(lifecycle.app)
-        return WorkflowResult(
-            ok=business_result.ok,
-            name="import_person_info_workflow",
-            status=business_result.status,
-            steps=[*lifecycle_result.steps, *business_result.steps],
-            evidence=business_result.evidence,
-            error=business_result.error,
-            error_type=business_result.error_type,
-            error_code=business_result.error_code,
-            side_effect_started=business_result.side_effect_started,
-            side_effect_committed=business_result.side_effect_committed,
-            retry_allowed=business_result.retry_allowed,
+        self._init_workflow(
+            config=config,
+            logger=logger,
+            app_factory=app_factory,
+            runtime_options=runtime_options,
+            step_runner=step_runner,
+            reset=reset,
         )
 
-    def run_on_app(self, app: Any) -> WorkflowResult:
+    def execute(self, app: Any) -> WorkflowResult:
         """在已经登录的客户端应用上执行当前业务工作流。"""
         steps: list[StepResult] = []
         page = OpenPersonInfoPageStep(app.shell()).run()
-        import_file = self._run_step(
+        import_file = self.context.step(
             "person_info.import_person_file",
             lambda: ImportPersonFileStep(page).run(self.config.person_info_file),
             side_effect_step=True,
         )
         steps.append(import_file)
         if not import_file.ok:
-            return WorkflowResult(
-                ok=False,
-                name="import_person_info_workflow",
-                status=import_file.status,
+            return self.context.failed_from_step(
+                import_file,
                 steps=steps,
                 evidence={"import_file": import_file.evidence},
-                error=import_file.error,
-                error_type=import_file.error_type,
-                error_code=import_file.error_code,
-                side_effect_started=import_file.side_effect_started,
-                side_effect_committed=import_file.side_effect_committed,
-                retry_allowed=import_file.retry_allowed,
             )
 
-        validation_result = self._run_step(
+        validation_result = self.context.step(
             "person_info.wait_import_result",
             lambda: WaitImportResultStep(page).run(),
             matrix_step="personnel_import",
@@ -96,31 +58,26 @@ class ImportPersonInfoWorkflow:
         steps.append(validation_result)
 
         if validation_result.status == "ready_to_submit":
-            submit_result = self._run_step(
+            submit_result = self.context.step(
                 "person_info.submit_import_data",
                 lambda: SubmitImportDataStep(page).run(),
                 side_effect_step=True,
             )
             steps.append(submit_result)
             if not submit_result.ok:
-                return WorkflowResult(
-                    ok=False,
-                    name="import_person_info_workflow",
-                    status=submit_result.status,
+                return self.context.failed_from_step(
+                    submit_result,
                     steps=steps,
                     evidence={
                         "import_file": import_file.evidence,
                         "validation_result": validation_result.evidence,
                         "submit_result": submit_result.evidence,
                     },
-                    error=submit_result.error,
-                    error_type=submit_result.error_type,
-                    error_code=submit_result.error_code,
                     side_effect_started=True,
                     side_effect_committed=True,
                     retry_allowed=False,
                 )
-            import_result = self._run_step(
+            import_result = self.context.step(
                 "person_info.wait_submit_result",
                 lambda: WaitImportResultStep(page).run(),
                 matrix_step="personnel_import",
@@ -166,35 +123,11 @@ class ImportPersonInfoWorkflow:
         if validation_result.status == "ready_to_submit":
             evidence["submit_result"] = steps[-2].evidence
 
-        return WorkflowResult(
-            ok=import_result.ok,
-            name="import_person_info_workflow",
-            status=import_result.status,
+        return self.context.result_from_step(
+            import_result,
             steps=steps,
             evidence=evidence,
-            error=import_result.error,
-            error_type=import_result.error_type,
-            error_code=import_result.error_code,
             side_effect_started=side_effect_started,
             side_effect_committed=side_effect_committed,
             retry_allowed=False if side_effect_started else import_result.retry_allowed,
-        )
-
-    def _run_step(
-        self,
-        step: str,
-        operation: Callable[[], StepResult],
-        *,
-        matrix_step: str | None = None,
-        side_effect_step: bool = False,
-    ) -> StepResult:
-        """通过步骤执行器运行单个业务步骤，统一保留日志和结果。"""
-        if self.step_runner is None:
-            return operation()
-        return self.step_runner.run_step(
-            workflow="import_person_info_workflow",
-            step=step,
-            operation=operation,
-            matrix_step=matrix_step,
-            side_effect_step=side_effect_step,
         )

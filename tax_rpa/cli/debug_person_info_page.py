@@ -1,7 +1,5 @@
 import argparse
-import ctypes
 import json
-import subprocess
 import sys
 import traceback
 from dataclasses import replace
@@ -9,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from tax_rpa.app.tax_client_app import TaxClientApp
+from tax_rpa.cli.windows_admin import is_user_admin, relaunch_module_as_admin
 from tax_rpa.config.person_import import PersonImportConfig, load_import_config
 from tax_rpa.drivers.logger import RunLogger, to_jsonable
 from tax_rpa.pages.person_info.page import PersonInfoPage
@@ -19,30 +18,11 @@ from tax_rpa.runtime.result import StepResult
 
 
 MODULE_NAME = "tax_rpa.cli.debug_person_info_page"
-shell32 = ctypes.windll.shell32
-
-
-def is_user_admin() -> bool:
-    """判断当前进程是否具备管理员权限。"""
-    try:
-        return bool(shell32.IsUserAnAdmin())
-    except Exception:
-        return False
 
 
 def relaunch_as_admin(argv: list[str]) -> None:
     """以管理员权限重新启动当前命令。"""
-    params = subprocess.list2cmdline(["-m", MODULE_NAME, *argv])
-    result = shell32.ShellExecuteW(
-        None,
-        "runas",
-        sys.executable,
-        params,
-        str(Path.cwd()),
-        1,
-    )
-    if result <= 32:
-        raise RuntimeError(f"Failed to relaunch as administrator. ShellExecuteW={result}")
+    relaunch_module_as_admin(MODULE_NAME, argv)
 
 
 def parse_args() -> argparse.Namespace:

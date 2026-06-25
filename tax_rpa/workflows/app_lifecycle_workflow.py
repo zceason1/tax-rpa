@@ -1,9 +1,9 @@
 from collections.abc import Callable
 from typing import Any
 
-from tax_rpa.app.tax_client_app import TaxClientApp
 from tax_rpa.config.person_import import PersonImportConfig
 from tax_rpa.runtime.result import StepResult, WorkflowResult
+from tax_rpa.workflows.app_factory import create_tax_client_app
 
 
 class AppLifecycleWorkflow:
@@ -19,7 +19,7 @@ class AppLifecycleWorkflow:
         self.config = config
         self.logger = logger
         self.reset = reset
-        self.app_factory = app_factory or (lambda config, logger: TaxClientApp(config, logger))
+        self.app_factory = app_factory or create_tax_client_app
         self.app: Any | None = None
 
     def run(self) -> WorkflowResult:

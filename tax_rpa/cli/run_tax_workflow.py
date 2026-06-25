@@ -1,12 +1,10 @@
 import argparse
-import ctypes
-import subprocess
 import sys
 import traceback
-from pathlib import Path
 from typing import Any
 
 from tax_rpa.cli.execution_mode import with_execution_mode
+from tax_rpa.cli.windows_admin import is_user_admin, relaunch_module_as_admin
 from tax_rpa.testing.self_check_app import SelfCheckApp
 from tax_rpa.config.person_import import PersonImportConfig, load_import_config
 from tax_rpa.drivers.logger import RunLogger
@@ -19,7 +17,6 @@ from tax_rpa.workflows.update_special_deduction_workflow import (
 
 
 MODULE_NAME = "tax_rpa.cli.run_tax_workflow"
-shell32 = ctypes.windll.shell32
 
 
 class WorkflowExecutionError(RuntimeError):
@@ -49,27 +46,9 @@ def failure_payload(exc: Exception) -> dict[str, Any]:
     return payload
 
 
-def is_user_admin() -> bool:
-    """判断当前进程是否具备管理员权限。"""
-    try:
-        return bool(shell32.IsUserAnAdmin())
-    except Exception:
-        return False
-
-
 def relaunch_as_admin(argv: list[str]) -> None:
     """以管理员权限重新启动当前命令。"""
-    params = subprocess.list2cmdline(["-m", MODULE_NAME, *argv])
-    result = shell32.ShellExecuteW(
-        None,
-        "runas",
-        sys.executable,
-        params,
-        str(Path.cwd()),
-        1,
-    )
-    if result <= 32:
-        raise RuntimeError(f"Failed to relaunch as administrator. ShellExecuteW={result}")
+    relaunch_module_as_admin(MODULE_NAME, argv)
 
 
 def parse_args() -> argparse.Namespace:
@@ -123,9 +102,9 @@ def run_workflow(
         reset=reset,
         app_factory=app_factory,
         workflow_factories=[
-            lambda config, logger: ImportPersonInfoWorkflow(config, logger),
-            lambda config, logger: UpdateSpecialDeductionWorkflow(config, logger),
-            lambda config, logger: ImportSalaryIncomeWorkflow(config, logger),
+            lambda config, logger, **kwargs: ImportPersonInfoWorkflow(config, logger, **kwargs),
+            lambda config, logger, **kwargs: UpdateSpecialDeductionWorkflow(config, logger, **kwargs),
+            lambda config, logger, **kwargs: ImportSalaryIncomeWorkflow(config, logger, **kwargs),
         ],
     )
     result = workflow.run()

@@ -262,9 +262,12 @@ Page/Step returns StepResult
 
 | 文件 | 职责 |
 | --- | --- |
-| `__init__.py` | 常用 workflow 导出。 |
+| `__init__.py` | 常用 workflow 惰性导出，避免非 Windows 测试导入时加载真实驱动。 |
+| `app_factory.py` | 延迟创建真实 `TaxClientApp` 的默认工厂。 |
 | `app_lifecycle_workflow.py` | 客户端启动、登录、主窗口准备。 |
+| `base.py` | `BusinessWorkflow` 基类，统一 standalone lifecycle 和 `run_on_app -> execute` 入口。 |
 | `combined_tax_workflow.py` | 组合完整税务业务链，处理失败恢复和 action policy 注入。 |
+| `context.py` | `WorkflowContext`，统一 StepResult 步骤执行和 WorkflowResult 包装。 |
 | `import_person_info_workflow.py` | 人员信息导入业务顺序。 |
 | `import_salary_income_workflow.py` | 薪资收入导入业务顺序。 |
 | `update_special_deduction_workflow.py` | 专项附加扣除更新业务顺序。 |

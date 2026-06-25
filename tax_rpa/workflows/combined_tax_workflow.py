@@ -1,5 +1,4 @@
 from collections.abc import Callable
-import inspect
 from typing import Any
 
 from tax_rpa.config.person_import import PersonImportConfig
@@ -125,12 +124,12 @@ class CombinedTaxWorkflow:
 
     def _build_business_workflow(self, factory: BusinessWorkflowFactory) -> Any:
         """执行工作流、组合税务工作流中的内部辅助逻辑：build业务工作流。"""
-        kwargs: dict[str, Any] = {}
-        if self.step_runner is not None and _accepts_parameter(factory, "step_runner"):
-            kwargs["step_runner"] = self.step_runner
-        if _accepts_parameter(factory, "runtime_options"):
-            kwargs["runtime_options"] = self.runtime_options
-        return factory(self.config, self.logger, **kwargs)
+        return factory(
+            self.config,
+            self.logger,
+            step_runner=self.step_runner,
+            runtime_options=self.runtime_options,
+        )
 
     def _attach_action_policy(self, app: Any) -> None:
         """执行工作流、组合税务工作流中的内部辅助逻辑：attach动作策略。"""
@@ -141,15 +140,3 @@ class CombinedTaxWorkflow:
             return
         if hasattr(app_context, "action_policy"):
             app_context.action_policy = self.action_policy
-
-
-def _accepts_parameter(factory: BusinessWorkflowFactory, name: str) -> bool:
-    """执行工作流、组合税务工作流中的内部辅助逻辑：accepts参数。"""
-    try:
-        signature = inspect.signature(factory)
-    except (TypeError, ValueError):
-        return False
-    parameters = signature.parameters
-    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()):
-        return True
-    return name in parameters

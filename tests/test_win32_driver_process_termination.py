@@ -1,9 +1,10 @@
 import unittest
 from unittest.mock import patch
 
-import psutil
+from tax_rpa.drivers import win32_driver
 
-from tax_rpa.drivers.win32_driver import Win32Driver
+psutil = win32_driver.psutil
+Win32Driver = win32_driver.Win32Driver
 
 
 class FakeLogger:
